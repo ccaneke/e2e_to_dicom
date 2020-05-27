@@ -14,7 +14,7 @@ namespace E2EFileInterpreter
         {
             List<object> list = new List<object>();
 
-            
+
             //System.Collections.
             //await HeaderAsync("aaa");
             // Test Header read
@@ -30,14 +30,36 @@ array[index]);
                     };
 
                     print(item as ushort[]);
-                } else
-                Console.WriteLine(item/*nameof(item)*/);
+                }
+                else
+                    Console.WriteLine(item/*nameof(item)*/);
                 //Console.WriteLine(item is ushort[]);
 
                 list.Add(item);
             }
 
-            Header header = new Header(list[0] as string, (uint) list[1], list[2] as ushort[], (UInt16) list[3] );
+            Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
+
+            list.Clear();
+            await foreach (var item in MainDirectoryAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"))
+            {
+                if (item is UInt16[])
+                {
+                    Action<ushort[]> print = (numbers) =>
+                    {
+                        foreach (ushort number in numbers)
+                        {
+                            Console.WriteLine(number);
+                        }
+                    };
+                } else
+                {
+                    Console.WriteLine(item);
+                }
+
+                list.Add(item);
+
+            }
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
