@@ -167,7 +167,59 @@ array[index]);
                 FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, true);
                 fileStream.Position = position + 1;
                 fileStreams.Add(fileStream);
+
+                byte[] buffer = new byte[0x1000];
+
+                int numRead = await fileStream.ReadAsync(buffer, 0, 4);
+
+                byte[] array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                // Note: that UInt32 would be better because numEntries should never be negative.
+                Int32 numEntries = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0];
+
+                yield return numEntries;
+
+                numRead = await fileStream.ReadAsync(buffer, 0, count: 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, length: numRead);
+
+                // After bitwise shifting is complete, the least significant byte array[0] is now at the rightmost position (i.e. the
+                // least significant position) in big endian.
+                UInt32 current = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+
+                numRead = await fileStream.ReadAsync(buffer, 0, 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt32 value = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+
+                yield return value;
+
+                numRead = await fileStream.ReadAsync(buffer, 0, 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                // Remember that an integer is a group of bytes. So here the 32 bit integer is a group of 4 bytes.
+                UInt32 unknown = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+
+                yield return unknown;
+
+            } finally
+            {
+                // Update position before disposing the Stream
+                Program.position = fileStreams[0].Position;
+
+                fileStreams[0].Dispose();
             }
+
         }
 
         private static void Clear(byte[] arr, int index)
