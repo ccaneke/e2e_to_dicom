@@ -9,22 +9,47 @@ namespace E2EFileInterpreter
 {
     class Program
     {
+        static Int64 position;
         static async Task Main(string[] args)
         {
-            //System.Collections.
+            List<object> list = new List<object>();
 
+            
+            //System.Collections.
+            //await HeaderAsync("aaa");
             // Test Header read
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"))
+            // N.B. Looks like IAsyncEnumerable makes the program await the entire foreach loop instead of awaiting the iterator method.
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", 0))
             {
-                Console.WriteLine(item);
+                if (item is UInt16[])
+                {
+                    Action<ushort[]> print = (ushort[] array) =>
+                    {
+                        for (int index = 0; index < array.Length; index++) Console.WriteLine(
+array[index]);
+                    };
+
+                    print(item as ushort[]);
+                } else
+                Console.WriteLine(item/*nameof(item)*/);
+                //Console.WriteLine(item is ushort[]);
+
+                list.Add(item);
             }
+
+            Header header = new Header(list[0] as string, (uint) list[1], list[2] as ushort[], (UInt16) list[3] );
         }
 
-        public static async IAsyncEnumerable<object> HeaderAsync(string filePath)
+        public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
         {
             using (FileStream dataSourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
                                                         true))
             {
+                // The Test below shows that the position within a stream starts from 0.
+                //Int64 test = dataSourceStream.Position;
+
+                dataSourceStream.Position = positionWithinStream;
+
                 byte[] buffer = new byte[0x10000];
                 int numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 12);
 
@@ -37,7 +62,7 @@ namespace E2EFileInterpreter
                 //Decoder decoder = UTF8Encoding.UTF8.GetDecoder();
                 //yield return decoder.
 
-                yield return Encoding.UTF8.GetString(array);
+                yield return Encoding.UTF8.GetString(array) /*Encoding.ASCII.GetString(array)*/;
 
                 numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 4);
                 array = new byte[numRead];
@@ -46,7 +71,20 @@ namespace E2EFileInterpreter
                 // that are still in the byte array.
                 Array.Copy(buffer, array, length: 4);
 
-                yield return float.Parse(Encoding.UTF8.GetString(array));
+                //byte[] test = new byte[4];
+                char[] test2 = Encoding.UTF8.GetChars(array);
+
+                // bytes at offset 12 to 15 should be a 32 bit integer.
+                string decodedWithUTF8 = Encoding.UTF8.GetString(array);
+                string decodedText = Encoding.UTF32.GetString(array);
+                int a = 'd';
+                float b = 'd';
+                UInt32 c = 'd';
+
+                Int32 num = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | (array[0]);
+
+                //yield return float.Parse(Encoding.UTF32.GetString(array)/*Encoding.UTF8.GetString(array)*/);
+                yield return num;
 
                 // u16 is 2 bytes
                 numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18);
@@ -54,13 +92,31 @@ namespace E2EFileInterpreter
 
                 Array.Copy(buffer, array, length: numRead);
 
+                /*
+                 * Deprecated code
                 // Gets a UTF16 number string
                 string utf16NumberString = Encoding.Unicode.GetString(array);
 
                 // Convert the UTF16 number string into a utf16 number
-                ushort utf16Number = UInt16.Parse(utf16NumberString);
+                ushort utf16Number = UInt16.Parse(utf16NumberString);*/
 
-                yield return utf16Number;
+                UInt16 num2 = (ushort) ((array[1] << 8) | (array[0]));
+                UInt16[] numbers = new UInt16[] { (ushort) ((array[17] << 136) | (array[16] << 128)),
+                    (ushort) ((array[15] << 120) | (array[14] << 112)),
+                    (ushort) ((array[13] << 104) | (array[12] << 96)), (ushort) ((array[11] << 88) | (array[10] << 80)),
+                    (ushort) ((array[9] << 72) | (array[8] << 64)), (ushort) ((array[7] << 56) | (array[6] << 48)),
+                    (ushort) ((array[5] << 40) | (array[4] << 32)), (ushort) ((array[3] << 24) | (array[2] << 16)),
+                    (ushort) ((array[1] << 8) | (array[0])) };
+
+                yield return numbers;
+                /*
+                 * UInt16 num2 = (UInt16) ((array[17] << 136) | (array[16] << 128) | (array[15] << 120) | (array[14] << 112) | (array[13] << 104) |
+                    (array[12] << 96) | (array[11] << 88) | (array[10] << 80) | (array[9] << 72) | (array[8] << 64) | (array[7] << 56) |
+                    (array[6] << 48) | (array[5] << 40) | (array[4] << 32) | (array[3] << 24) | (array[2] << 16) | (array[1] << 8) |
+                    (array[0]));
+                 */
+
+                //yield return utf16Number;
 
                 // ReadAsync automatically advances the position within the current stream by the number of bytes read.
                 numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 2);
@@ -69,15 +125,49 @@ namespace E2EFileInterpreter
 
                 Array.Copy(buffer, array, length: numRead);
 
+                // without explicitly converting the 16 bit integer that is evaluated from the expression below, does C Sharp pad
+                // the 16 bit integers with zeros at the least significant position (i.e. rightmost position) to make up 32 binary digits?
+                // If so, then casting from int32 to UInt16 simply removes those 16 padded zeros that were added to the righmost position
+                // of the 16 bit integer.
+                UInt16 positiveNumber = (UInt16) ((array[1] << 8) | (array[0]));
+
+                yield return positiveNumber;
+                /*
+                 * Deprecated code
                 utf16NumberString = Encoding.Unicode.GetString(array);
 
                 utf16Number = UInt16.Parse(utf16NumberString);
 
-                yield return utf16Number;
+                yield return utf16Number;*/
 
+                // Assume that the position of bytes in a stream starts from 1.
+                position = dataSourceStream.Position;
             }
 
 
+        }
+
+        public static async IAsyncEnumerable<Object> MainDirectoryAsync(String filePath)
+        {
+            // I don't want to reuse a stream because I want the read operations (i.e. HeadersAsync, MainDirectoryAsync) to run
+            // asynchronously
+
+            // return "2"; does not work
+            //yield return "2";
+
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", Program.position))
+            {
+                yield return item;
+            }
+
+            List<FileStream> fileStreams = new List<FileStream>();
+
+            try
+            {
+                FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, true);
+                fileStream.Position = position + 1;
+                fileStreams.Add(fileStream);
+            }
         }
 
         private static void Clear(byte[] arr, int index)
