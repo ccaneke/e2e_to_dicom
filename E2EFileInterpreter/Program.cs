@@ -60,6 +60,23 @@ array[index]);
                 list.Add(item);
 
             }
+
+            object obj = new MainDirectory();
+
+            // Throws InvalidCastException. Find out why?
+            //MainDirectory obj2 = (MainDirectory) new object();
+
+            MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
+
+            // test
+            string filePath = "/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E";
+            FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+
+            // SeekOrigin.Begin means the value of current starting from the beginning of the stream.
+                long pos = sourceStream.Seek(mainDirectory.current, origin: SeekOrigin.Begin);
+
+            byte[] buffer = new byte[0x1000];
+            int numRead = await sourceStream.ReadAsync(buffer, 0, count: 10);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -79,6 +96,15 @@ array[index]);
 
                 Array.Copy(buffer, array, length: numRead);
 
+                // N.B. a set is just an array
+                Char[] testArray = Encoding.Unicode.GetChars(array);
+                Char[] testArray2 = Encoding.BigEndianUnicode.GetChars(array);
+                Char[] testArray3 = Encoding.ASCII.GetChars(array);
+
+                // Why does UTF8.GetChars(array) return only 5 characters when array is an array of 12 bytes and UTF8 means that a byte
+                // is one character?
+                Char[] testArray4 = Encoding.UTF8.GetChars(array);
+                Char[] testArray5 = Encoding.UTF32.GetChars(array);
                 //var subset = from element in array select "" + element;
 
                 //Decoder decoder = UTF8Encoding.UTF8.GetDecoder();
@@ -106,7 +132,12 @@ array[index]);
                 Int32 num = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | (array[0]);
 
                 //yield return float.Parse(Encoding.UTF32.GetString(array)/*Encoding.UTF8.GetString(array)*/);
-                yield return num;
+
+                UInt32 testConverted = (UInt32)num;
+                // Big endian is like a mirror image of little endian, and vice versa.
+                UInt32 testConverted2 = (UInt32) (array[3] << 24) | (UInt32) (array[2] << 16) | (UInt32) (array[1] << 8) | array[0];
+                UInt32 testConverted3 = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+                yield return (UInt32) num;
 
                 // u16 is 2 bytes
                 numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18);
@@ -187,7 +218,14 @@ array[index]);
             try
             {
                 FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, true);
-                fileStream.Position = position + 1;
+
+            // After reading a byte, ReadAsync advances the position within the stream by the number of bytes read and continues
+            // reading bytes from the next byte. So the current position within a stream is always the position that follows the last
+            // byte that was read by the ReadAsync method. Therefore to continue reading bytes from where ReadAsync left off there is
+            // no need to add 1 to the position within the current stream.
+            // See the following link for more detail:
+            // https://chat.stackoverflow.com/transcript/message/49490002#49490002
+                fileStream.Position = position /*+ 1*/;
                 fileStreams.Add(fileStream);
 
                 byte[] buffer = new byte[0x1000];
@@ -201,7 +239,7 @@ array[index]);
                 // Note: that UInt32 would be better because numEntries should never be negative.
                 Int32 numEntries = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0];
 
-                yield return numEntries;
+                yield return (UInt32) numEntries;
 
                 numRead = await fileStream.ReadAsync(buffer, 0, count: 4);
 
@@ -212,6 +250,8 @@ array[index]);
                 // After bitwise shifting is complete, the least significant byte array[0] is now at the rightmost position (i.e. the
                 // least significant position) in big endian.
                 UInt32 current = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+
+                yield return current;
 
                 numRead = await fileStream.ReadAsync(buffer, 0, 4);
 

@@ -8,7 +8,7 @@ namespace E2EFileInterpreter
         UInt16[] unknown;
         UInt16 unknown2;
         uint numEntries;
-        UInt32 current;
+        public UInt32 current;
         uint unknown3;
         UInt32 unknown4;
 
