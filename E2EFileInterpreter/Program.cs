@@ -208,7 +208,9 @@ array[index]);
             // return "2"; does not work
             //yield return "2";
 
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", Program.position))
+            long positionWithinStream = position + 36;
+
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", positionWithinStream/*Program.position + 36*/))
             {
                 yield return item;
             }
