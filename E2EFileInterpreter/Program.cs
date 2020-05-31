@@ -10,6 +10,7 @@ namespace E2EFileInterpreter
     class Program
     {
         static Int64 position;
+        static int count;
         static async Task Main(string[] args)
         {
             List<object> list = new List<object>();
@@ -73,10 +74,30 @@ array[index]);
             FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
 
             // SeekOrigin.Begin means the value of current starting from the beginning of the stream.
-                long pos = sourceStream.Seek(mainDirectory.current, origin: SeekOrigin.Begin);
+                long pos = sourceStream.Seek(mainDirectory.current /*mainDirectory.numEntries*/, origin: SeekOrigin.Begin);
+
+            long positionTest = sourceStream.Position;
 
             byte[] buffer = new byte[0x1000];
-            int numRead = await sourceStream.ReadAsync(buffer, 0, count: 10);
+            int numRead = await sourceStream.ReadAsync(buffer, 0, count: /*10*//*16*/ /*73*/ 89);
+
+            byte[] arrayTest = new byte[numRead];
+
+            Array.Copy(buffer, arrayTest, numRead);
+
+            string testString = BitConverter.ToString(arrayTest);
+
+            char charTest = BitConverter.ToChar(arrayTest, startIndex: 0);
+
+            string testString2 = Encoding.ASCII.GetString(arrayTest);
+            string testString3 = Encoding.UTF8.GetString(arrayTest);
+            string testString4 = Encoding.UTF32.GetString(arrayTest);
+
+            // I tried finding the offset, assuming that the structure of the e2e file described by uocte holds but with an offset, but
+            // it is futile and like searching for a needle in a haystack, never mind that there might not be any offset and the structure
+            // of the e2e file described by uocte is not for this particular uocte file, may be because the structure described by uocte is
+            // outdated.
+
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -84,6 +105,7 @@ array[index]);
             using (FileStream dataSourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
                                                         true))
             {
+                count += 1;
                 // The Test below shows that the position within a stream starts from 0.
                 //Int64 test = dataSourceStream.Position;
 
@@ -140,7 +162,15 @@ array[index]);
                 yield return (UInt32) num;
 
                 // u16 is 2 bytes
-                numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18);
+
+                int maxBytes = 54;
+
+                if(count > 1)
+                {
+                    maxBytes = 57;
+                }
+
+                numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, /*18*/ /*54*/ maxBytes);
                 array = new byte[numRead];
 
                 Array.Copy(buffer, array, length: numRead);
@@ -154,14 +184,55 @@ array[index]);
                 ushort utf16Number = UInt16.Parse(utf16NumberString);*/
 
                 UInt16 num2 = (ushort) ((array[1] << 8) | (array[0]));
-                UInt16[] numbers = new UInt16[] { (ushort) ((array[17] << 136) | (array[16] << 128)),
-                    (ushort) ((array[15] << 120) | (array[14] << 112)),
-                    (ushort) ((array[13] << 104) | (array[12] << 96)), (ushort) ((array[11] << 88) | (array[10] << 80)),
-                    (ushort) ((array[9] << 72) | (array[8] << 64)), (ushort) ((array[7] << 56) | (array[6] << 48)),
-                    (ushort) ((array[5] << 40) | (array[4] << 32)), (ushort) ((array[3] << 24) | (array[2] << 16)),
-                    (ushort) ((array[1] << 8) | (array[0])) };
 
-                yield return numbers;
+                // To convert a byte array to an array of unsigned 16 bit integers you must convert every two bytes as you traverse the
+                // byte array from index 0 to Length - 1, not how I wrongly tried to convert a byte array to a UInt16[] shown below
+                //UInt16[] numbers = new UInt16[] { (ushort) ((array[17] << 136) | (array[16] << 128)),
+                //    (ushort) ((array[15] << 120) | (array[14] << 112)),
+                //    (ushort) ((array[13] << 104) | (array[12] << 96)), (ushort) ((array[11] << 88) | (array[10] << 80)),
+                //    (ushort) ((array[9] << 72) | (array[8] << 64)), (ushort) ((array[7] << 56) | (array[6] << 48)),
+                //    (ushort) ((array[5] << 40) | (array[4] << 32)), (ushort) ((array[3] << 24) | (array[2] << 16)),
+                    //(ushort) ((array[1] << 8) | (array[0])) };
+
+                //BitConverter.ToUInt16(va)
+
+                // When optimizing code may be initialize u16Array with a null value
+                UInt16[] u16Array = new ushort[27];
+
+                if (count > 1)
+                {
+                    u16Array = new ushort[29];
+                }
+
+                Action<byte[], UInt16[]> convert = (arr, arr2) =>
+                {
+                    for (int index = 0, j = 0; index < arr.Length; index += 2, j++)
+                    {
+
+                        if (arr.Length == 54)
+                        {
+                            arr2[j] = BitConverter.ToUInt16(arr, startIndex: index);
+                        } else if (arr.Length == 57)
+                        {
+                            if (index != arr.Length - 1)
+                            {
+                                u16Array[j] = BitConverter.ToUInt16(arr, index);
+                            }
+                            else
+                            {
+                                // Avoids ArgumentException
+                                u16Array[j] = 2019;
+                            }
+
+                        }
+                    }
+                };
+
+                convert(array, u16Array);
+
+                yield return u16Array;
+
+                //yield return numbers;
                 /*
                  * UInt16 num2 = (UInt16) ((array[17] << 136) | (array[16] << 128) | (array[15] << 120) | (array[14] << 112) | (array[13] << 104) |
                     (array[12] << 96) | (array[11] << 88) | (array[10] << 80) | (array[9] << 72) | (array[8] << 64) | (array[7] << 56) |
@@ -171,8 +242,14 @@ array[index]);
 
                 //yield return utf16Number;
 
+                int bytesToRead = 2;
+
+                if (Program.count > 1)
+                {
+                    bytesToRead = /*1*/0;
+                }
                 // ReadAsync automatically advances the position within the current stream by the number of bytes read.
-                numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 2);
+                numRead = await dataSourceStream.ReadAsync(buffer, 0, count: /*2*/bytesToRead);
 
                 array = new byte[numRead];
 
@@ -182,7 +259,18 @@ array[index]);
                 // the 16 bit integers with zeros at the least significant position (i.e. rightmost position) to make up 32 binary digits?
                 // If so, then casting from int32 to UInt16 simply removes those 16 padded zeros that were added to the righmost position
                 // of the 16 bit integer.
-                UInt16 positiveNumber = (UInt16) ((array[1] << 8) | (array[0]));
+
+                UInt16 positiveNumber;
+                if (bytesToRead == 2)
+                {
+                    /*UInt16*/ positiveNumber = (UInt16) ((array[1] << 8) | (array[0]));
+
+                } else
+                {
+                    // Just returning 0 when reading main_directory, ideally should return null
+                    positiveNumber = 0/*(UInt16)array[0]*/;
+                }
+                //UInt16 testA = (UInt16)array[0];
 
                 yield return positiveNumber;
                 /*
@@ -193,7 +281,6 @@ array[index]);
 
                 yield return utf16Number;*/
 
-                // Assume that the position of bytes in a stream starts from 1.
                 position = dataSourceStream.Position;
             }
 
@@ -208,9 +295,10 @@ array[index]);
             // return "2"; does not work
             //yield return "2";
 
-            long positionWithinStream = position + 36;
+            //// No need to start reading at a position of 72 because 9x 0xffff is now 57 instead of 18
+            //long positionWithinStream = /*position + */ 36;
 
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", positionWithinStream/*Program.position + 36*/))
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", position /*positionWithinStream*//*Program.position + 36*/))
             {
                 yield return item;
             }
