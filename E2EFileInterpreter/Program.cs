@@ -20,7 +20,7 @@ namespace E2EFileInterpreter
             //await HeaderAsync("aaa");
             // Test Header read
             // N.B. Looks like IAsyncEnumerable makes the program await the entire foreach loop instead of awaiting the iterator method.
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", 0))
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
             {
                 if (item is UInt16[])
                 {
@@ -42,7 +42,7 @@ array[index]);
             Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
 
             list.Clear();
-            await foreach (var item in MainDirectoryAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"))
+            await foreach (var item in MainDirectoryAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
             {
                 if (item is UInt16[])
                 {
@@ -70,7 +70,7 @@ array[index]);
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
             // test
-            string filePath = "/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E";
+            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
             FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
 
             // SeekOrigin.Begin means the value of current starting from the beginning of the stream.
@@ -79,7 +79,7 @@ array[index]);
             long positionTest = sourceStream.Position;
 
             byte[] buffer = new byte[0x1000];
-            int numRead = await sourceStream.ReadAsync(buffer, 0, count: /*10*//*16*/ /*73*/ 89);
+            int numRead = await sourceStream.ReadAsync(buffer, 0, count: 12 /*10*//*16*/ /*73*/ /*89*/);
 
             byte[] arrayTest = new byte[numRead];
 
@@ -163,14 +163,15 @@ array[index]);
 
                 // u16 is 2 bytes
 
+                /*
                 int maxBytes = 54;
 
                 if(count > 1)
                 {
                     maxBytes = 57;
-                }
+                }*/
 
-                numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, /*18*/ /*54*/ maxBytes);
+                numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18 /*54*/ /*maxBytes*/);
                 array = new byte[numRead];
 
                 Array.Copy(buffer, array, length: numRead);
@@ -197,18 +198,21 @@ array[index]);
                 //BitConverter.ToUInt16(va)
 
                 // When optimizing code may be initialize u16Array with a null value
-                UInt16[] u16Array = new ushort[27];
+                UInt16[] u16Array = new ushort[9];
 
+                /*
                 if (count > 1)
                 {
                     u16Array = new ushort[29];
-                }
+                }*/
 
                 Action<byte[], UInt16[]> convert = (arr, arr2) =>
                 {
                     for (int index = 0, j = 0; index < arr.Length; index += 2, j++)
                     {
 
+                        arr2[j] = BitConverter.ToUInt16(arr, startIndex: index);
+                        /*
                         if (arr.Length == 54)
                         {
                             arr2[j] = BitConverter.ToUInt16(arr, startIndex: index);
@@ -224,7 +228,7 @@ array[index]);
                                 u16Array[j] = 2019;
                             }
 
-                        }
+                        }*/
                     }
                 };
 
@@ -242,14 +246,15 @@ array[index]);
 
                 //yield return utf16Number;
 
-                int bytesToRead = 2;
+                //int bytesToRead = 2;
 
-                if (Program.count > 1)
-                {
-                    bytesToRead = /*1*/0;
-                }
+                //if (Program.count > 1)
+                //{
+                //    bytesToRead = /*1*/0;
+                //}
+
                 // ReadAsync automatically advances the position within the current stream by the number of bytes read.
-                numRead = await dataSourceStream.ReadAsync(buffer, 0, count: /*2*/bytesToRead);
+                numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 2 /*bytesToRead*/);
 
                 array = new byte[numRead];
 
@@ -260,16 +265,19 @@ array[index]);
                 // If so, then casting from int32 to UInt16 simply removes those 16 padded zeros that were added to the righmost position
                 // of the 16 bit integer.
 
-                UInt16 positiveNumber;
-                if (bytesToRead == 2)
-                {
-                    /*UInt16*/ positiveNumber = (UInt16) ((array[1] << 8) | (array[0]));
+                UInt16 positiveNumber = (UInt16) ((array[1] << 8) | array[0]);
 
-                } else
-                {
-                    // Just returning 0 when reading main_directory, ideally should return null
-                    positiveNumber = 0/*(UInt16)array[0]*/;
-                }
+                
+                //UInt16 positiveNumber;
+                //if (bytesToRead == 2)
+                //{
+                //    /*UInt16*/ positiveNumber = (UInt16) ((array[1] << 8) | (array[0]));
+
+                //} else
+                //{
+                //    // Just returning 0 when reading main_directory, ideally should return null
+                //    positiveNumber = 0/*(UInt16)array[0]*/;
+                //}
                 //UInt16 testA = (UInt16)array[0];
 
                 yield return positiveNumber;
@@ -298,7 +306,8 @@ array[index]);
             //// No need to start reading at a position of 72 because 9x 0xffff is now 57 instead of 18
             //long positionWithinStream = /*position + */ 36;
 
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E", position /*positionWithinStream*//*Program.position + 36*/))
+            // Todo: Replace hard coded file path with variable or parameter.
+            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
             {
                 yield return item;
             }
@@ -313,8 +322,7 @@ array[index]);
             // reading bytes from the next byte. So the current position within a stream is always the position that follows the last
             // byte that was read by the ReadAsync method. Therefore to continue reading bytes from where ReadAsync left off there is
             // no need to add 1 to the position within the current stream.
-            // See the following link for more detail:
-            // https://chat.stackoverflow.com/transcript/message/49490002#49490002
+
                 fileStream.Position = position /*+ 1*/;
                 fileStreams.Add(fileStream);
 
