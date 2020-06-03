@@ -4,6 +4,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Collections;
 
 namespace E2EFileInterpreter
 {
@@ -84,6 +85,7 @@ array[index]);
             // of the e2e file described by uocte is not for this particular uocte file, may be because the structure described by uocte is
             // outdated. */
 
+            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: filePath);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -535,6 +537,101 @@ array[index]);
             ushort number = (UInt16)((twoBytes[1] << 8) | twoBytes[0]);
 
             return number;
+        }
+
+        private static async Task</*Hashtable*/Dictionary<string, /*object*/Dictionary<string, object>>> ReadDataChunksAsync(string filePath)
+        {
+            // Dictionary<string, object> should be able to achieve the same result as using a hashtable
+            /*Hashtable chunk = new Hashtable();*/
+
+            Dictionary<string, /*object*/Dictionary<string, object>> chunks =
+                                                                    new Dictionary<string, /*object*/ Dictionary<string, object>>();
+
+            FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+            byte[] buffer = new byte[0x1000];
+
+            for (int index = /*0*/dataChunksToProcess.Count - 1; index >= 0 /*< dataChunksToProcess.Count*/; index--/*index++*/)
+            {
+                Dictionary<string, object> chunk = new Dictionary<string, object>();
+                int startingPositionOfChunk = (int)dataChunksToProcess./*Peek().Item1*/Pop().Item1;
+                long positionWithinStream = sourceStream.Seek(startingPositionOfChunk, SeekOrigin.Begin);
+
+                int numRead = await sourceStream.ReadAsync(buffer, 0, 12);
+                byte[] twelveBytes = new byte[numRead];
+
+                Array.Copy(buffer, twelveBytes, numRead);
+
+                string magic4 = Encoding.UTF8.GetString(twelveBytes);
+
+                chunk.Add("magic4", magic4);
+
+                UInt32 unknown1 = await GetU32EntryAsync(sourceStream, buffer);
+                uint unknown2 = await GetU32EntryAsync(sourceStream, buffer);
+                uint pos = await GetU32EntryAsync(sourceStream, buffer);
+                uint size = await GetU32EntryAsync(sourceStream, buffer);
+                uint unknown3 = await GetU32EntryAsync(sourceStream, buffer);
+                uint patient_id = await GetU32EntryAsync(sourceStream, buffer);
+                UInt32 study_id = await GetU32EntryAsync(sourceStream, buffer);
+                UInt32 series_id = await GetU32EntryAsync(sourceStream, buffer);
+                UInt32 slice_id = await GetU32EntryAsync(sourceStream, buffer);
+                ushort ind = await GetU16EntryAsync(sourceStream, buffer);
+                ushort unknown4 = await GetU16EntryAsync(sourceStream, buffer);
+                uint type = await GetU32EntryAsync(sourceStream, buffer);
+                uint unknown5 = await GetU32EntryAsync(sourceStream, buffer);
+
+                chunk["unknown1"] = unknown1;
+                chunk[nameof(unknown2)] = unknown2;
+                chunk["pos"] = pos;
+                chunk[nameof(size)] = size;
+                chunk[nameof(unknown3)] = unknown3;
+                chunk["patient_id"] = patient_id;
+                chunk["study_id"] = study_id;
+                chunk["series_id"] = series_id;
+                chunk[nameof(slice_id)] = slice_id;
+                chunk["ind"] = ind;
+                chunk["unknown4"] = unknown4;
+                chunk["type"] = type;
+                chunk[nameof(unknown5)] = unknown5;
+
+                // If type == 0x00000009 read additional patient info.
+                // Test:
+                uint test = 0x00000009;
+                if (type == 0x00000009)
+                {
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 31);
+                    byte[] thirtyOneBytes = new byte[numRead];
+
+                    Array.Copy(buffer, thirtyOneBytes, numRead);
+
+                    string givenName = Encoding.UTF8.GetString(thirtyOneBytes);
+
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 66);
+
+                    byte[] sixtySixBytes = new byte[numRead];
+
+                    Array.Copy(buffer, sixtySixBytes, numRead);
+
+                    string surname = Encoding.UTF8.GetString(sixtySixBytes);
+
+                    uint birthdate = await GetU32EntryAsync(sourceStream, buffer);
+
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 1);
+                    byte oneByte = buffer[0];
+
+                    // A character can represent an unsigned integer https://www.tamasoft.co.jp/en/general-info/unicode-decimal.html,
+                    // or in other words, an unsigned integer can be represented by a character.
+                    char sex = (char)oneByte;
+
+                    chunk["given_name"] = givenName;
+                    chunk.Add(nameof(surname), surname);
+                    chunk.Add("birthdate", birthdate);
+                }
+
+                chunks.Add("chunk " + dataChunksToProcess.Count, chunk);
+            }
+
+            return chunks;
+            
         }
     }
 }
