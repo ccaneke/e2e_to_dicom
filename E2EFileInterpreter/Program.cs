@@ -11,6 +11,10 @@ namespace E2EFileInterpreter
     {
         static Int64 position;
         static int count;
+
+        // May be rename dataChunksToProcess to addresses of data chunks.
+        static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
+
         static async Task Main(string[] args)
         {
             List<object> list = new List<object>();
@@ -71,32 +75,14 @@ array[index]);
 
             // test
             string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
-            FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
 
-            // SeekOrigin.Begin means the value of current starting from the beginning of the stream.
-                long pos = sourceStream.Seek(mainDirectory.current /*mainDirectory.numEntries*/, origin: SeekOrigin.Begin);
-
-            long positionTest = sourceStream.Position;
-
-            byte[] buffer = new byte[0x1000];
-            int numRead = await sourceStream.ReadAsync(buffer, 0, count: 12 /*10*//*16*/ /*73*/ /*89*/);
-
-            byte[] arrayTest = new byte[numRead];
-
-            Array.Copy(buffer, arrayTest, numRead);
-
-            string testString = BitConverter.ToString(arrayTest);
-
-            char charTest = BitConverter.ToChar(arrayTest, startIndex: 0);
-
-            string testString2 = Encoding.ASCII.GetString(arrayTest);
-            string testString3 = Encoding.UTF8.GetString(arrayTest);
-            string testString4 = Encoding.UTF32.GetString(arrayTest);
-
+            await TraverseListOfDirectoryChunks(mainDirectory.current, filePath);
+            /*
+             * I should probably remove this comment.
             // I tried finding the offset, assuming that the structure of the e2e file described by uocte holds but with an offset, but
             // it is futile and like searching for a needle in a haystack, never mind that there might not be any offset and the structure
             // of the e2e file described by uocte is not for this particular uocte file, may be because the structure described by uocte is
-            // outdated.
+            // outdated. */
 
         }
 
@@ -334,6 +320,7 @@ array[index]);
 
                 Array.Copy(buffer, array, numRead);
 
+                // numEntries is the number of data chunks to process in the second pass.
                 // Note: that UInt32 would be better because numEntries should never be negative.
                 Int32 numEntries = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0];
 
@@ -392,6 +379,162 @@ array[index]);
             arr[0] = 0;
 
             Clear(arr, index + 1);
+        }
+
+        public static async Task TraverseListOfDirectoryChunks(Int64 currentPosition, string filePath)
+        {
+            FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+
+            // Note: Consider putting the variables magic3, version etc. in a collection because if I want to write bytes to a new file
+            // after anonymizing specific bytes then having the variables in a collection would be useful to get the bytes from the data
+            // types string, UInt32 etc.
+
+            // Gets the number (i.e. chunks) of (directory) entries in a single linked list and adds the Tuple<start, size> to the stack.
+            // When the while condition is reached, if current is not zero, the do block repeats by seeking to the current value of
+            // current, continuing to get the number of entries in each directory chunk, and add (i.e. push) the Tuple<start, size> to the
+            // stack.
+            // Note: The Main directory is split into chunks, the do-while statement represents each directory chunk.
+            do
+            {
+                // Seek to the next directory chunk
+                // SeekOrigin.Begin means the value of current starting from the beginning of the stream.
+                long currentPositionWithinStream = sourceStream.Seek(/*mainDirectory.current*/ currentPosition /*mainDirectory.numEntries*/, origin: SeekOrigin.Begin);
+
+                long positionTest = sourceStream.Position;
+
+                byte[] buffer = new byte[0x1000];
+                int numRead = await sourceStream.ReadAsync(buffer, 0, count: 12 /*10*//*16*/ /*73*/ /*89*/);
+
+                byte[] array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                //string testString = BitConverter.ToString(array);
+
+                //char charTest = BitConverter.ToChar(array, startIndex: 0);
+
+                //string testString2 = Encoding.ASCII.GetString(array);
+                //string testString3 = Encoding.UTF8.GetString(array);
+                //string testString4 = Encoding.UTF32.GetString(array);
+
+                string magic3 = Encoding.UTF8.GetString(array);
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt32 version = (UInt32)(array[3] << 24) | (UInt32)(array[2] << 16) | (UInt32)(array[1] << 8) | (UInt32)array[0];
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 18);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                ushort[] arrayOf16BitIntegers = new UInt16[9];
+
+                Action<byte[], UInt16[]> convert = (arr1, arr2) =>
+                {
+                    for (int index = 0, j = 0; index < arr2.Length; index++, j += 2)
+                    {
+                        arr2[index] = BitConverter.ToUInt16(arr1, startIndex: j);
+                    }
+                };
+
+                convert(array, arrayOf16BitIntegers);
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 2);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt16 unknown = (UInt16)((array[1] << 8) | array[0]);
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                // numEntries is the number of entries in each directory chunk
+                uint numEntries = (uint)(array[3] << 24) | (uint)(array[2] << 16) | (UInt32)(array[1] << 8) | (UInt32)array[0];
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt32 unknown2 = (ushort)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt32 prev = (uint)(array[3] << 24) | (uint)(array[2] << 16) | (uint)(array[1] << 8) | (UInt32)array[0];
+
+                numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+                array = new byte[numRead];
+
+                Array.Copy(buffer, array, numRead);
+
+                UInt32 unknown3 = (UInt32)(array[3] << 24) | (uint)(array[2] << 16) | (uint)(array[1] << 8) | (UInt32)array[0];
+
+                // Iterate over the number of entries in each directory chunk.
+                for (; numEntries >= 1; numEntries--)
+                {
+                    // start is the starting position of a chunk in the binary file.
+                    var pos = await GetU32EntryAsync(sourceStream, buffer);
+                    var start = await GetU32EntryAsync(sourceStream, buffer);
+                    var size = await GetU32EntryAsync(sourceStream, buffer);
+                    var unknown4 = await GetU32EntryAsync(sourceStream, buffer);
+                    var patient_id = await GetU32EntryAsync(sourceStream, buffer);
+                    var study_id = await GetU32EntryAsync(sourceStream, buffer);
+                    var series_id = await GetU32EntryAsync(sourceStream, buffer);
+                    var slice_id = await GetU32EntryAsync(sourceStream, buffer);
+                    var unknown5 = await GetU16EntryAsync(sourceStream, buffer);
+                    var unknown6 = await GetU16EntryAsync(sourceStream, buffer);
+                    var type = await GetU32EntryAsync(sourceStream, buffer);
+                    var unknown7 = await GetU32EntryAsync(sourceStream, buffer);
+
+                    if (start > pos)
+                    {
+                        dataChunksToProcess.Push(new Tuple<UInt32, UInt32>(start, size));
+                    }
+                }
+
+                currentPosition = prev;
+            } while (currentPosition != 0);
+
+        }
+
+        public static async Task<UInt32> GetU32EntryAsync(FileStream sourceStream, byte[] buffer/*, byte[] fourBytes*/)
+        {
+            int numRead = await sourceStream.ReadAsync(buffer, 0, 4);
+
+            byte[] fourBytes = new byte[numRead];
+
+            Array.Copy(buffer, fourBytes, numRead);
+
+            UInt32 number = (UInt32)(fourBytes[3] << 24) | (UInt32)(fourBytes[2] << 16) | (uint)(fourBytes[1] << 8) | (uint)fourBytes[0];
+
+            return number;
+        }
+
+        public static async Task<ushort> GetU16EntryAsync(FileStream sourceStream, byte[] buffer)
+        {
+            int numRead = await sourceStream.ReadAsync(buffer, 0, 2);
+            byte[] twoBytes = new byte[numRead];
+
+            Array.Copy(buffer, twoBytes, numRead);
+
+            ushort number = (UInt16)((twoBytes[1] << 8) | twoBytes[0]);
+
+            return number;
         }
     }
 }
