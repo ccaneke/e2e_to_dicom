@@ -647,6 +647,29 @@ array[index]);
                     chunk.Add("birthdate", birthdate);
                     //chunk[nameof(sex)] = sex;
                     chunk.Add("patient_identifier", patientIdentifier);
+                } else if (type == 10)
+                {
+                    // After the chunk structure described above there are 16 bytes between the last entry in the chunk structure (i.e.
+                    // unknown5). And I am assuming that the 16 bytes are an array of 16 bit integers.
+                    // Note: that the chunk structure defined above is a total of 60 bytes, from magic4 to unknown5.
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 16);
+                    byte[] sixteenBytes = new byte[numRead];
+
+                    Array.Copy(buffer, sixteenBytes, numRead);
+
+                    UInt16[] unknown6 = ToUInt16Array(sixteenBytes);
+
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 36);
+
+                    byte[] thirtySixBytes = new byte[numRead];
+
+                    // Only copy the bytes that were read.
+                    Array.Copy(buffer, thirtySixBytes, numRead);
+
+                    string fullNameOfOperator = Encoding.UTF8.GetString(thirtySixBytes);
+
+                    chunk.Add(nameof(unknown6), unknown6);
+                    chunk["full_name_of_operator"] = fullNameOfOperator;
                 }
 
                 // Stack.Pop() removes an element so add 1 to the count of elements in the stack.
@@ -657,7 +680,11 @@ array[index]);
             
         }
 
-        // Todo: Use position of bytes to find out which chunk contains the the bytes that represent the camera operator, e.g. Jane Gray.
+        // Todo: Use position of bytes to find out which chunk contains the bytes that represent the camera operator, e.g. Jane C B Gray.
+        // Update: "Jane C B Gray" starts at index 24094 which means that the string "Jane C B Gray" is in chunk 5 which has a type of 10,
+        // the operator info "Jane C B Gray" is in chunk 5 because chunk 5 starts at the byte position 24018. Since the type 10 is unique
+        // in all data chunks, therefore the condition if (chunk.type == 10) can be used to indicate the chunk with the camera operator
+        // info.
 
         public static async Task PrintBytesInFileAsync(string filePath)
         {
@@ -675,6 +702,18 @@ array[index]);
             {
                 Console.WriteLine("Index: " + index + $", byte: {wholeFile[index]}");
             }
+        }
+
+        private static UInt16[] ToUInt16Array(byte[] bytes)
+        {
+            ushort[] arrayOfUInt16 = new UInt16[bytes.Length / 2];
+
+            for(int i = 0, j = 0; j < bytes.Length - 1; j += 2, i++)
+            {
+                arrayOfUInt16[i] = BitConverter.ToUInt16(bytes, j);
+            }
+
+            return arrayOfUInt16;
         }
     }
 }
