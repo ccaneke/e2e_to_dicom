@@ -86,6 +86,9 @@ array[index]);
             // outdated. */
 
             Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: filePath);
+
+            // Print test
+            await PrintBytesInFileAsync(filePath);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -391,6 +394,9 @@ array[index]);
             // after anonymizing specific bytes then having the variables in a collection would be useful to get the bytes from the data
             // types string, UInt32 etc.
 
+            // Update: The explanation below is incorrect since prev is 0 in the first iteration of the do-while statement, so current
+            // changes to zero therefore the do block only executes once. The correct understanding is that numEntries is the number of
+            // directory chunks. There are 512 directory chunks to traverse.
             // Gets the number (i.e. chunks) of (directory) entries in a single linked list and adds the Tuple<start, size> to the stack.
             // When the while condition is reached, if current is not zero, the do block repeats by seeking to the current value of
             // current, continuing to get the number of entries in each directory chunk, and add (i.e. push) the Tuple<start, size> to the
@@ -615,23 +621,60 @@ array[index]);
 
                     uint birthdate = await GetU32EntryAsync(sourceStream, buffer);
 
+                    /*
                     numRead = await sourceStream.ReadAsync(buffer, 0, 1);
                     byte oneByte = buffer[0];
 
                     // A character can represent an unsigned integer https://www.tamasoft.co.jp/en/general-info/unicode-decimal.html,
                     // or in other words, an unsigned integer can be represented by a character.
-                    char sex = (char)oneByte;
+                    char sex = (char)oneByte;*/
+
+                    // The patient identifier (i.e. hospital number) a thirty character string (i.e. u8[30]) that is padded with white
+                    // space. The first character of the patient identifier is the sex of the patient (i.e. 'M' or 'F'). So extract
+                    // patient identifier instead of just the sex of the patient.
+                    // Note: that a Null byte (i.e. decimal byte value 0) as a character is represented as a white space character
+                    // https://www.tamasoft.co.jp/en/general-info/unicode-decimal.html.
+
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 30);
+                    byte[] thirtyBytes = new byte[numRead];
+
+                    Array.Copy(buffer, thirtyBytes, numRead);
+
+                    string patientIdentifier = Encoding.UTF8.GetString(thirtyBytes);
 
                     chunk["given_name"] = givenName;
                     chunk.Add(nameof(surname), surname);
                     chunk.Add("birthdate", birthdate);
+                    //chunk[nameof(sex)] = sex;
+                    chunk.Add("patient_identifier", patientIdentifier);
                 }
 
-                chunks.Add("chunk " + dataChunksToProcess.Count, chunk);
+                // Stack.Pop() removes an element so add 1 to the count of elements in the stack.
+                chunks.Add("chunk " + (dataChunksToProcess.Count + 1), chunk);
             }
 
             return chunks;
             
+        }
+
+        // Todo: Use position of bytes to find out which chunk contains the the bytes that represent the camera operator, e.g. Jane Gray.
+
+        public static async Task PrintBytesInFileAsync(string filePath)
+        {
+            FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+
+            byte[] buffer = new byte[0x1000000];
+
+            int numRead = await fileStream.ReadAsync(buffer, 0, buffer.Length);
+
+            byte[] wholeFile = new byte[numRead];
+
+            Array.Copy(buffer, wholeFile, numRead);
+
+            for (int index = 0; index < wholeFile.Length; index++)
+            {
+                Console.WriteLine("Index: " + index + $", byte: {wholeFile[index]}");
+            }
         }
     }
 }
