@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Collections;
+using AnonymizationLibrary;
 
 namespace E2EFileInterpreter
 {
@@ -89,6 +90,14 @@ array[index]);
 
             // Print test
             await PrintBytesInFileAsync(filePath);
+
+            string patient_identifier = (String) chunks["chunk 47"]["patient_identifier"];
+
+            Randomizer randomizer = new Randomizer(patient_identifier);
+            randomizer.shuffleCharacters();
+
+            string anonymized_patient_identifier = randomizer.randomizedMrn;
+
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
