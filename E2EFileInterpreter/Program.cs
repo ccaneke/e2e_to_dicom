@@ -98,6 +98,22 @@ array[index]);
 
             string anonymized_patient_identifier = randomizer.randomizedMrn;
 
+            string pseudo_given_name = "Patient";
+
+            string[] familyNames = null;
+
+            try
+            {
+                familyNames = await File.ReadAllLinesAsync("/Users/christopheraneke/Projects/E2EFileInterpreter/E2EFileInterpreter/" +
+                                "family_names.txt");
+            } catch (Exception)
+            {
+
+            }
+
+            Random randomNumberGenerator = new Random();
+
+            string anonymized_surname = familyNames[randomNumberGenerator.Next(maxValue: familyNames.Length)];
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
