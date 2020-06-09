@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Collections;
 using AnonymizationLibrary;
+using System.Diagnostics;
 
 namespace E2EFileInterpreter
 {
@@ -16,6 +17,8 @@ namespace E2EFileInterpreter
 
         // May be rename dataChunksToProcess to addresses of data chunks.
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
+
+        static string filePath = /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/"/tmp/ASLAM01T.E2E";
 
         static async Task Main(string[] args)
         {
@@ -93,7 +96,7 @@ array[index]);
 
             string patient_identifier = (String) chunks["chunk 47"]["patient_identifier"];
 
-            Randomizer randomizer = new Randomizer(patient_identifier);
+            Randomizer randomizer = new Randomizer(patient_identifier.Replace("\0", string.Empty));
             randomizer.shuffleCharacters();
 
             string anonymized_patient_identifier = randomizer.randomizedMrn;
@@ -114,6 +117,12 @@ array[index]);
             Random randomNumberGenerator = new Random();
 
             string anonymized_surname = familyNames[randomNumberGenerator.Next(maxValue: familyNames.Length)];
+
+            string anonymized_full_name_of_operator = "Mrs Camera Operator";
+
+            SearchAndReplace(patient_identifier, (string) chunks["chunk 47"]["given_name"], (String) chunks["chunk 47"]["surname"],
+                (String) chunks["chunk 5"]["full_name_of_operator"], anonymized_patient_identifier,
+                pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -739,6 +748,90 @@ array[index]);
             }
 
             return arrayOfUInt16;
+        }
+
+        public static void SearchAndReplace(string pattern1, string pattern2, string pattern3, string pattern4, string str1, string str2,
+                                                        string str3, string str4)
+        {   // Todo: Modify copy
+            // Todo: Anonymize copy
+
+            // Remove trailing white spaces.
+            // Note: that a null byte is a white space character.
+            // Update: Not sure whether a Null byte is a white space character, instead I think a null byte (i.e. the unsigned integer 0)
+            // is just the special character \0 which means ___.
+            pattern1 = pattern1.TrimEnd(trimChar: '\0');
+            pattern2 = pattern2.TrimEnd('\0');
+            pattern3 = pattern3.TrimEnd('\0');
+            pattern4 = pattern4.TrimEnd('\0');
+
+            // Copy file
+            //string fileName = GetDirectory(filePath);
+            string newFile = GetDirectory(filePath) + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+            // -4 because of the three characters E 2 E and then subtract 1 to get the index, or in other words, -4 because you subtract
+            // 1 to get the index and then the fourth index from the end of the string ASLAM01T.E2E is the character . which is where the
+            // string "Copy" will be inserted, thereby shifting the character '.' one index to the right. 
+            File.Copy(sourceFileName: filePath, destFileName: GetDirectory(filePath) +
+                GetFileName(filePath).Insert(startIndex: GetFileName(filePath).Length - 4, value: "Copy"));
+
+            // I think the warning "Can't find string terminator "'" anywhere before EOF at -e line 1." is because the second ' (i.e. the
+            // string terminator ') is not on line 1 due to the concetenation. So put the whole string on one line.
+            /*string test = $"-i -pe 's/{pattern1}/{str1}/; s/{pattern2}/{str2}/; " +
+                $"s/{pattern3}/{str3}/; s/{pattern4}/{str4}/'" + " " + newFile;*/
+
+            string test2 = $"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile;
+
+            string test3 = $"-i -pe \"s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\"" + " " + newFile;
+            // Process I want to start
+            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: "/usr/bin/perl", /*$"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; " +
+                $"s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile*//*test*/test3);
+
+            processStartInfo.UseShellExecute = true;
+
+            // Rename the variable process to perl.
+            Process process = new Process();
+
+
+            process.StartInfo = processStartInfo;
+
+            // Start the instance of a program specified by the Process.StartInfo property of this Process component (i.e. object), and
+            // associates it with the process component (i.e. process object).
+            process.Start();
+        }
+
+        // Todo: Test whether g (i.e. global) is needed in the substitute commands.
+        // Update: g (i.e. global) is not needed because without g the substitute command only replaces the first occurrence of the
+        // matching pattern.
+
+        public static string GetDirectory(string filePath)
+        {
+            string DirectoryPath = "";
+
+            for (int index = filePath.Length - 1; index >= 0; index--)
+            {
+                if (filePath[index] == '/')
+                {
+                    DirectoryPath = filePath.Remove(index + 1);
+                    break;
+                }
+            }
+
+            return DirectoryPath;
+        }
+
+        public static string GetFileName(string filePath)
+        {
+            string fileName = "";
+
+            for (int index = filePath.Length - 1; index >= 0; index--)
+            {
+                if (filePath[index] == '/')
+                {
+                    fileName = filePath.Substring(startIndex: index + 1);
+                    break;
+                }
+            }
+
+            return fileName;
         }
     }
 }
