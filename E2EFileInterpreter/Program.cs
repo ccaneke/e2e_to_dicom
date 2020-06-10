@@ -18,7 +18,12 @@ namespace E2EFileInterpreter
         // May be rename dataChunksToProcess to addresses of data chunks.
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
 
-        static string filePath = /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/"/tmp/ASLAM01T.E2E";
+        static string filePath = /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/"/tmp/ASLAM01T.E2E" /*"/tmp/ASLAM01TAnonymized.E2E"*/;
+
+        static int Given_name_entry_length { get; set; }
+        static int Surname_entry_length { get; set; }
+        static int Patient_identifier_entry_length { get; set; }
+        static int Full_name_of_operator_entry_length { get; set; }
 
         static async Task Main(string[] args)
         {
@@ -29,7 +34,7 @@ namespace E2EFileInterpreter
             //await HeaderAsync("aaa");
             // Test Header read
             // N.B. Looks like IAsyncEnumerable makes the program await the entire foreach loop instead of awaiting the iterator method.
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
+            await foreach (var item in HeaderAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
             {
                 if (item is UInt16[])
                 {
@@ -51,7 +56,7 @@ array[index]);
             Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
 
             list.Clear();
-            await foreach (var item in MainDirectoryAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
+            await foreach (var item in MainDirectoryAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
             {
                 if (item is UInt16[])
                 {
@@ -79,7 +84,7 @@ array[index]);
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
             // test
-            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
+            string filePath = /*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
 
             await TraverseListOfDirectoryChunks(mainDirectory.current, filePath);
             /*
@@ -120,8 +125,13 @@ array[index]);
 
             string anonymized_full_name_of_operator = "Mrs Camera Operator";
 
-            SearchAndReplace(patient_identifier, (string) chunks["chunk 47"]["given_name"], (String) chunks["chunk 47"]["surname"],
-                (String) chunks["chunk 5"]["full_name_of_operator"], anonymized_patient_identifier,
+            patient_identifier = patient_identifier.Replace("\0", "\\0");
+
+            // Calls to Replace() method must come after the four properties ending with length are assigned a value, in order to
+            // avoid breaking the PadWithNullCharacters method.
+            SearchAndReplace(patient_identifier, ((string) chunks["chunk 47"]["given_name"]).Replace("\0", "\\0"),
+                ((String) chunks["chunk 47"]["surname"]).Replace("\0", "\\0"),
+                ((String) chunks["chunk 5"]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
                 pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
         }
 
@@ -332,7 +342,7 @@ array[index]);
             //long positionWithinStream = /*position + */ 36;
 
             // Todo: Replace hard coded file path with variable or parameter.
-            await foreach (var item in HeaderAsync("/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
+            await foreach (var item in HeaderAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
             {
                 yield return item;
             }
@@ -645,6 +655,10 @@ array[index]);
 
                     string givenName = Encoding.UTF8.GetString(thirtyOneBytes);
 
+                    // Test
+                    int testLength = givenName.Length;
+
+
                     numRead = await sourceStream.ReadAsync(buffer, 0, 66);
 
                     byte[] sixtySixBytes = new byte[numRead];
@@ -652,6 +666,7 @@ array[index]);
                     Array.Copy(buffer, sixtySixBytes, numRead);
 
                     string surname = Encoding.UTF8.GetString(sixtySixBytes);
+
 
                     uint birthdate = await GetU32EntryAsync(sourceStream, buffer);
 
@@ -681,6 +696,18 @@ array[index]);
                     chunk.Add("birthdate", birthdate);
                     //chunk[nameof(sex)] = sex;
                     chunk.Add("patient_identifier", patientIdentifier);
+
+                    // Remember the length of entries of interest.
+                    Given_name_entry_length = thirtyOneBytes.Length;
+                    Surname_entry_length = sixtySixBytes.Length;
+                    Patient_identifier_entry_length = thirtyBytes.Length;
+
+                    /*
+                     * Note: This can also be used to stop C Sharp from removing null characters when I convert bytes to string
+                    // Calls to Replace must come after remembering the length of entries of interest, in order to avoid breaking the
+                    // function PadWithNullCharacters
+                    givenName = givenName.Replace("\0", "\\0");
+                    surname = surname.Replace("\0", "\\0");*/
                 } else if (type == 10)
                 {
                     // After the chunk structure described above there are 16 bytes between the last entry in the chunk structure (i.e.
@@ -704,6 +731,13 @@ array[index]);
 
                     chunk.Add(nameof(unknown6), unknown6);
                     chunk["full_name_of_operator"] = fullNameOfOperator;
+
+                    // Record the length of an entry of interest.
+                    Full_name_of_operator_entry_length = thirtySixBytes.Length;
+
+                    /*
+                    // This must come last to avoid braking the function PadWithNullCharacters
+                    fullNameOfOperator = fullNameOfOperator.Replace("\0", "\\0");*/
                 }
 
                 // Stack.Pop() removes an element so add 1 to the count of elements in the stack.
@@ -754,15 +788,24 @@ array[index]);
                                                         string str3, string str4)
         {   // Todo: Modify copy
             // Todo: Anonymize copy
+            // Todo: This current SearchAndReplace method inserts the string into the binary file and shifts the bytes to the right
+            // therefore changing the structure of the E2E file and adding bytes to it. To solve this problem may be use the entire
+            // entry with padded null bytes as a pattern and replace this entire entry with a new entry that contains the replacement
+            // string padded with the number of null bytes calculated from total bytes in the new entry minus the number of non-null bytes
+            // at the end of the sequence of bytes in that entry. This way I am always replacing the same number of bytes so the size
+            // of the E2E file should remain the same after the E2E file is anonymized.
+            // Note: that perl uses the special character \0 to match a null character i.e. ^@ in a binary file.
 
             // Remove trailing white spaces.
             // Note: that a null byte is a white space character.
             // Update: Not sure whether a Null byte is a white space character, instead I think a null byte (i.e. the unsigned integer 0)
             // is just the special character \0 which means ___.
-            pattern1 = pattern1.TrimEnd(trimChar: '\0');
+            /*pattern1 = pattern1.TrimEnd(trimChar: '\0');
             pattern2 = pattern2.TrimEnd('\0');
             pattern3 = pattern3.TrimEnd('\0');
-            pattern4 = pattern4.TrimEnd('\0');
+            pattern4 = pattern4.TrimEnd('\0');*/
+
+            Tuple<string, string, String, String> quadruple = PadWithNullCharacters(str1, str2, str3, str4);
 
             // Copy file
             //string fileName = GetDirectory(filePath);
@@ -780,22 +823,42 @@ array[index]);
 
             string test2 = $"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile;
 
-            string test3 = $"-i -pe \"s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\"" + " " + newFile;
+            //string test3 = $"-i -pe \"s/{pattern1}/{quadruple.Item1}/\"" + " " + newFile;
+            //string test3 = $"-i \"s/{pattern1}/{quadruple.Item1}/\"" + " " + newFile;
+            //string test3 = $"-i -pe \"s/{pattern1}/{str1}/\"" + " " + newFile;
+            //string test3 = @"-i -pe ""s/M12870\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0/HN4696\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0/""" + " " + newFile;
+
+            /*
+            // To solve the problem of C Sharp interpreting \0 you have to apply @ at the source of the string (i.e. when the string is
+            // created).
+            string x = @"M12870\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+            string y = @"HN4696\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+            string test3 = $"-i -pe \"s/{x}/{y}/\"" + " " + newFile;*/
+
+
+            // Todo: Stop C Sharp from interpreting string that contains null byte characters.
+            // Update: Done by using verbatim string which is then passed to perl.
+            // Update2: The first update is wrong because @ can only be used for a string literal.
+            string argument = $"-i -pe \"s/{pattern1}/{quadruple.Item1/*str1*/}/; s/{pattern2}/{quadruple.Item2/*str2*/}/; s/{pattern3}/{quadruple.Item3/*str3*/}/; s/{pattern4}/{quadruple.Item4/*str4*/}/\"" + " " + newFile;
+
+            Console.WriteLine("HERE IS THE VALUE OF THE VARIABLE ARGUMENT:");
+            Console.WriteLine(argument);
+
             // Process I want to start
-            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: "/usr/bin/perl", /*$"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; " +
-                $"s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile*//*test*/test3);
+            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: /*"sed"*/"perl"/*"/usr/bin/perl"*/, /*$"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; " +
+                $"s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile*//*test*/argument);
 
             processStartInfo.UseShellExecute = true;
 
-            // Rename the variable process to perl.
-            Process process = new Process();
+            // Rename the variable process to perl. Done
+            Process perl = new Process();
 
-
-            process.StartInfo = processStartInfo;
+            perl.StartInfo = processStartInfo;
 
             // Start the instance of a program specified by the Process.StartInfo property of this Process component (i.e. object), and
-            // associates it with the process component (i.e. process object).
-            process.Start();
+            // associate it with the process component (i.e. process object).
+            perl.Start();
         }
 
         // Todo: Test whether g (i.e. global) is needed in the substitute commands.
@@ -832,6 +895,37 @@ array[index]);
             }
 
             return fileName;
+        }
+
+        public static Tuple<string, String, string, string> PadWithNullCharacters(string str1, string str2, String str3, string str4)
+        {
+            // Positional prameters must be in the order patient identifer, given name, surname, and full name of operator
+            UInt32 numTrailingNullCharsInNewPatientIdentifierEntry = (UInt32) (Patient_identifier_entry_length - str1.Length);
+            Int32 numTrailingNullCharsInNewGivenNameEntry = Given_name_entry_length - str2.Length;
+            int numTrailingNullCharsInNewSurnameEntry = Surname_entry_length - str3.Length;
+            uint numTrailingNullCharsInFullNameOfOperatorEntry = (UInt32)Full_name_of_operator_entry_length - (uint)str4.Length;
+
+            for (int count = 1; count <= numTrailingNullCharsInNewPatientIdentifierEntry; count++)
+            {
+                str1 += "\\0";
+            }
+
+            for (int count = 1; count <= numTrailingNullCharsInNewGivenNameEntry; count++)
+            {
+                str2 += "\\0";
+            }
+
+            for (int count = 1; count <= numTrailingNullCharsInNewSurnameEntry;count++)
+            {
+                str3 += "\\0";
+            }
+
+            for (int count = 1; count <= numTrailingNullCharsInFullNameOfOperatorEntry;count++)
+            {
+                str4 += "\\0";
+            }
+
+            return new Tuple<string, string, String, String>(str1, str2, str3, str4);
         }
     }
 }
