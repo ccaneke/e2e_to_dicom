@@ -646,6 +646,8 @@ array[index]);
                 // If type == 0x00000009 read additional patient info.
                 // Test:
                 uint test = 0x00000009;
+                uint test2 = 0x0000000B;
+                uint test3 = 0x0000000b;
                 if (type == 0x00000009)
                 {
                     numRead = await sourceStream.ReadAsync(buffer, 0, 31);
@@ -711,7 +713,7 @@ array[index]);
                 } else if (type == 10)
                 {
                     // After the chunk structure described above there are 16 bytes between the last entry in the chunk structure (i.e.
-                    // unknown5). And I am assuming that the 16 bytes are an array of 16 bit integers.
+                    // unknown5) and the camera operator name. And I am assuming that the 16 bytes are an array of 16 bit integers.
                     // Note: that the chunk structure defined above is a total of 60 bytes, from magic4 to unknown5.
                     numRead = await sourceStream.ReadAsync(buffer, 0, 16);
                     byte[] sixteenBytes = new byte[numRead];
@@ -738,6 +740,216 @@ array[index]);
                     /*
                     // This must come last to avoid braking the function PadWithNullCharacters
                     fullNameOfOperator = fullNameOfOperator.Replace("\0", "\\0");*/
+                } else if (type == 0x0000000B)
+                {
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 14);
+                    byte[] fourteenBytes = new byte[numRead];
+
+                    Array.Copy(buffer, fourteenBytes, numRead);
+
+                    string unknownInLaterality = Encoding.UTF8.GetString(fourteenBytes);
+
+                    numRead = await sourceStream.ReadAsync(buffer, 0, 1);
+                    byte oneByte = buffer[0];
+
+                    char laterality = (char) oneByte;
+                    
+                } else if (type == 0x40000000)
+                {
+                    UInt32 sizeOfImage = await GetU32EntryAsync(sourceStream, buffer);
+                    UInt32 typeOfImage = await GetU32EntryAsync(sourceStream, buffer);
+                    uint unknownInImageData = await GetU32EntryAsync(sourceStream, buffer);
+                    uint width = await GetU32EntryAsync(sourceStream, buffer);
+                    UInt32 height = await GetU32EntryAsync(sourceStream, buffer);
+                    int test4 = (int)height * (int)width;
+                    int test5 = (int)(height * width);
+
+                    if (ind == 0)
+                    {
+                        // Use larger array when the number of bytes height * wdith (i.e. 380928) is being written to the buffer.
+                        buffer = new byte[0x100000];
+                        numRead = await sourceStream.ReadAsync(buffer, 0, (int) height * (int) width);
+
+                        // No need for bit shift because each element of array is just a byte
+                        byte[] raw_fundus_image = new byte[height * width];
+                        Array.Copy(buffer, raw_fundus_image, numRead);
+                    } else
+                    {
+                        //new BitArray().
+                        //Math.floor
+                        //BitConverter.
+
+                        // Use larger array when the number of bytes height * width (i.e. 380928) is being written to the buffer.
+                        buffer = new byte[0x100000];
+                        numRead = await sourceStream.ReadAsync(buffer, 0, (int)(height * width));
+                        byte[] tomogramImageData = new byte[numRead];
+
+                        Array.Copy(buffer, tomogramImageData, numRead);
+
+                        // Debugger shows that BitArray automatically converts bytes from little endian to big endian (i.e. BitArray uses
+                        // big endian).
+                        BitArray bits = new BitArray(tomogramImageData);
+
+                        //List<float> realNumbers = new List<float>();
+                        List<Double> realNumbers = new List<double>();
+
+                        //Array array = new Array();
+
+                        int countOfStacks = 0;
+
+                        // Initialize delegate type with a lambda expression.
+                        DPlaceHolder<BitArray, int/*, Object*/> dPlaceHolder = null;
+
+                        dPlaceHolder = (BitArray bitArray, /*int takes*/ int currentIndex) =>
+                        {
+                            // Tests
+                            countOfStacks += 1;
+                            Console.WriteLine($"currentIndex: {currentIndex}, number of bits: {bits.Length}, number of stacks: {countOfStacks}");
+                            // Todo: This recurive function should work since 3047424 % 16 == 0 watch part 2 of that video tutorial of
+                            // the visual studio debugger to find out when the stack overflows. Update: print statement above shows that
+                            // the stack over flows after the 1080th function frame that is added to the function stack. So either
+                            // recursion cannot handle this solution or I have to find a way to increase the size of the function stack
+                            // by a lot.
+
+                            // May be rename count to index
+
+                            // At first gets the first sixteen elements i.e. elements 0 to 15, then the next sixteen elements, i.e. elements
+                            // 16 to 32 
+
+                            // Count jumps by 16 in each recursive call. No need to subtract 1 because currentIndex goes up by 16 so
+                            // is always even. This conditional statement means as soon as the currentIndex, and since bitArray is an
+                            // array of n bytes * 8 (i.e. each byte is 8 binary digits) therefore 16 should go into n * 8 binary digits.
+                            // Correction: Since "uf16[height][width] raw tomogram slice image" (i.e. tomogramImageData is an array of
+                            // 16 bits, or in other words since the BitArray object named bits is made up of multiple 16 bits, and each
+                            // element of the BitArray object named bits is a bit) that means that 16 should go into the total number of
+                            // elements in the BitArray object named bits (i.e. the number of elements in the BitArray object named bits
+                            // is divisible by 16 which means that when currentIndex (which increases by 16 in each recursive call)
+                            // reaches the same value as bitArray.Length that means that we have reached the end of the BitArray object
+                            // named bits which also means that (via the for loops in this recursive function) we have accessed all
+                            // elements in the BitArray object named bits.
+                            if (/*takes == bitArray.Length / 16*/currentIndex == bitArray.Length/* - 1*/)
+                            {
+                                return;
+                            }
+
+                            //BitArray takenBits = bitArray.CopyTo(arr)
+
+                            bool[] floatingPointRepresentation = new bool[16];
+
+                            //int a = (int) true;
+
+                            //const int end = index;
+                            int end = currentIndex + 16;
+                            // Replace the parameter index used in the loop with the variable begin because the increment expression
+                            // index++ increases the value of index which affects the recursion. The count of the List<Double> named
+                            // realNumbers should be only sixteen times less than the parameter index, e.g. if realNumbers.Count is 4
+                            // then index should be 64.
+                            int begin = currentIndex;
+                            for (int i = 0; /*index*/ begin < end/*index + 16*/; /*index++*/begin++, i++)
+                            {
+                                //BitConverter.ToDouble()
+                                floatingPointRepresentation[i] = bitArray[/*index*/begin];
+
+                            }
+
+                            // 10 bit mantissa
+                            bool[] mantissa = new bool[10];
+
+                            // 6 bit exponent
+                            bool[] exponent = new bool[6];
+
+                            for (int i = 0; i < floatingPointRepresentation.Length; i++)
+                            {
+                                if (i < 10)
+                                {
+                                    mantissa[i] = floatingPointRepresentation[i];
+                                }
+                                else
+                                {
+                                    // Subtract 10 to start from index 0 of the array named exponent.
+                                    exponent[i - 10] = floatingPointRepresentation[i];
+                                }
+                            }
+
+                            //BitArray mantissaBits = new
+                            // IEnumerable<T> is an iterator just like an iterator method, or iterator get accessor
+                            // mantissaAsBinaryNumber should be a sequence of 1s and 0s.
+                            IEnumerable<int> mantissaAsBinaryNumber = mantissa.Select<bool, int>((x) =>
+                            {
+                                int bit = Convert.ToInt32(x);
+
+                                return bit;
+                            });
+
+                            //int b = 0b10111;
+                            //Convert.ToDouble("11", 2);
+                            Convert.ToInt32("1011", 2);
+                            //Convert.ToInt32(mantissaAsBinaryNumber, 2);
+
+                            // Attempting to convert mantissaAsBinaryNumber to Int32 below throws the exception System.InvalidCastException.
+                            //int testingConversion = Convert.ToInt32(mantissaAsBinaryNumber);
+
+                            IEnumerable<int> exponentAsBinary = exponent.Select<bool, int>((x) =>
+                            {
+                                int bit = Convert.ToInt32(x);
+                                return bit;
+                            });
+
+                            //mantissaAsBinaryNumber.ToS
+                            /*DPlaceHolder2 mantissaBinaryNumberString = (arg1, arg2) =>
+                            {
+                                if ((long)arg2 == arg1.LongCount<int>() - 1)
+                                {
+                                    return "";
+                                }
+
+                                // Recursion does not work for a lambda expression
+                                return arg1.ElementAt<int>(arg2) + mantissaBinaryNumberString(arg1, arg2 + 1);
+                            }*/
+
+                            // Initialize delegate with a method
+                            DPlaceHolder2 dPlaceHolder2 = ConvertToNumberString;
+
+                            string mantissaAsNumberString = dPlaceHolder2(mantissaAsBinaryNumber, 0);
+                            string exponentAsNumberString = dPlaceHolder2(exponentAsBinary, 0);
+
+                            // Add 1 to get the significand because the mantissa is the fractional part in the range 0 to 1, and the
+                            // integer part of the significand (the coefficient?) is in the range 1 to 2.
+                            // Order of Arithmetic operations means that / (i.e. division) operations are executed before + (i.e. addition)
+                            // operations.
+                            //float significand =
+                            // Note: that dividing the mantissa as an integer (i.e. the mantissa in integer form) by Math.Pow(x: 2, y: 10)
+                            // gets the mantissa into the form of a fraction which is the way the mantissa should be.
+                            double significand = 1 + Convert.ToInt32(mantissaAsNumberString, 2) / Math.Pow(x: 2, y: 10);
+
+                            // Not sure yet why 63 is subtracted from the exponent but I think it has something to do with the
+                            // bias, and I'm not sure why the exponent is reversed again.
+                            // Update on the same day: I think that the reason 63 is subtracted from the exponent is to make sure
+                            // that the exponent is less than or equal to 0, so eMax (i.e. max exponent) is 0. In order words, I suspect
+                            // that the reason that 63 is subtracted from the exponent is to make sure that we have a negative exponent
+                            // because if you have a negative exponent then the decimal number moves to the left of the significand
+                            // when you multiple the significand and the exponentiation b^n. e^63 must be the maximum exponent.
+
+
+                            // Note: that since recursion does not work in a lamda expression I will have to move this whole block of code
+                            // to a static recursive method.
+                            // Note: that I will need to change the type of the List<T> named realNumbers to double since both the
+                            // significand, and exponentiation I multiple to get a real number are doubles.
+
+                            // Unbiased exponent, since the highest the exponent can be is 63, just subtract 63 from the exponent. This
+                            // makes the exponent always negative so that the decimal point always "floats" to the left, never to the
+                            // right.
+                            Int32 exponentInDecimalSystem = Convert.ToInt32(exponentAsNumberString, fromBase: 2) - 63;
+
+                            double numericalValueOfFloatingPointRepresentationOfANumber = significand * Math.Pow(x: 2, y: exponentInDecimalSystem);
+
+                            realNumbers.Add(numericalValueOfFloatingPointRepresentationOfANumber);
+
+                            dPlaceHolder(bitArray, currentIndex + 16);
+                        };
+
+                        dPlaceHolder(bits, 0);
+                    }
                 }
 
                 // Stack.Pop() removes an element so add 1 to the count of elements in the stack.
@@ -746,6 +958,23 @@ array[index]);
 
             return chunks;
             
+        }
+
+        public delegate /*R*/void DPlaceHolder<in A, in B/*, out R*/>(A a, B b );
+
+        public delegate string DPlaceHolder2(IEnumerable<int> sequence, int index);
+
+        public static string ConvertToNumberString(IEnumerable<int> seq, int index)
+            // Note: Make sure this method does not reverse the string
+        {
+            // Generic parameter <int> (i.e. <TSource> means that the input source is the data from the IEnumerable from which
+            // LongCount<> is called.
+            if ((Int64)index == seq.LongCount<int>())
+            {
+                return ""; 
+            }
+
+            return seq.ElementAt<int>(index) + ConvertToNumberString(seq, index + 1);
         }
 
         // Todo: Use position of bytes to find out which chunk contains the bytes that represent the camera operator, e.g. Jane C B Gray.
@@ -927,5 +1156,10 @@ array[index]);
 
             return new Tuple<string, string, String, String>(str1, str2, str3, str4);
         }
+
+        // Todo: Read and interpret laterality, and image data (, and may be contour data too if it is necessary). Store all image data
+        // in a data structure such as a list, array or stack (automatic growing may be useful). Then create a Dicom class that uses
+        // a standard library that converts an array of image data to DICOM.
+
     }
 }
