@@ -18,12 +18,15 @@ namespace E2EFileInterpreter
         // May be rename dataChunksToProcess to addresses of data chunks.
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
 
-        static string filePath = /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/"/tmp/ASLAM01T.E2E" /*"/tmp/ASLAM01TAnonymized.E2E"*/;
+        static string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/tmp/ASLAM01TAnonymized.E2E"*/;
 
         static int Given_name_entry_length { get; set; }
         static int Surname_entry_length { get; set; }
         static int Patient_identifier_entry_length { get; set; }
         static int Full_name_of_operator_entry_length { get; set; }
+
+        // Global image data
+        public static double[] pixelImageData;
 
         static async Task Main(string[] args)
         {
@@ -34,7 +37,7 @@ namespace E2EFileInterpreter
             //await HeaderAsync("aaa");
             // Test Header read
             // N.B. Looks like IAsyncEnumerable makes the program await the entire foreach loop instead of awaiting the iterator method.
-            await foreach (var item in HeaderAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
+            await foreach (var item in HeaderAsync(Program.filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
             {
                 if (item is UInt16[])
                 {
@@ -56,7 +59,7 @@ array[index]);
             Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
 
             list.Clear();
-            await foreach (var item in MainDirectoryAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
+            await foreach (var item in MainDirectoryAsync(Program.filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
             {
                 if (item is UInt16[])
                 {
@@ -84,9 +87,9 @@ array[index]);
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
             // test
-            string filePath = /*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
+            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
 
-            await TraverseListOfDirectoryChunks(mainDirectory.current, filePath);
+            await TraverseListOfDirectoryChunks(mainDirectory.current, /*filePath*/Program.filePath);
             /*
              * I should probably remove this comment.
             // I tried finding the offset, assuming that the structure of the e2e file described by uocte holds but with an offset, but
@@ -94,7 +97,7 @@ array[index]);
             // of the e2e file described by uocte is not for this particular uocte file, may be because the structure described by uocte is
             // outdated. */
 
-            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: filePath);
+            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath/*filePath*/);
 
             // Print test
             await PrintBytesInFileAsync(filePath);
@@ -342,7 +345,7 @@ array[index]);
             //long positionWithinStream = /*position + */ 36;
 
             // Todo: Replace hard coded file path with variable or parameter.
-            await foreach (var item in HeaderAsync(/*"/tmp/ASLAM01TAnonymized.E2E"*/"/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
+            await foreach (var item in HeaderAsync(filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
             {
                 yield return item;
             }
@@ -794,20 +797,20 @@ array[index]);
                         List<Double> realNumbers = new List<double>();
 
                         //Array array = new Array();
-
+                        
                         int countOfStacks = 0;
 
                         // Initialize delegate type with a lambda expression.
-                        DPlaceHolder<BitArray/*, int*//*, Object*/> dPlaceHolder = null;
+                       DPlaceHolder<BitArray/*, int*//*, Object*/> dPlaceHolder = null;
 
                         dPlaceHolder = (BitArray bitArray/*,*/ /*int takes*/ /*int currentIndex*/) =>
                         {
-                        // Switch the relational operator <= to < in order to stop the following System.ArgumentOutOfRangeException.
-                        // currentIndex < 3047424 is correct because when currentIndex reaches 3047424 that means that it has taken the
-                        // previous 16 indexes which includes 3047424 - 1 (i.e. Length - 1) which is the index of the last element in the
-                        // collection named bits.:
-                        // Unhandled exception. System.ArgumentOutOfRangeException: Index was out of range. Must be non - negative and
-                        // less than the size of the collection. (Parameter 'index') Actual value was 3047424.
+                            // Switch the relational operator <= to < in order to stop the following System.ArgumentOutOfRangeException.
+                            // currentIndex < 3047424 is correct because when currentIndex reaches 3047424 that means that it has taken the
+                            // previous 16 indexes which includes 3047424 - 1 (i.e. Length - 1) which is the index of the last element in the
+                            // collection named bits.:
+                            // Unhandled exception. System.ArgumentOutOfRangeException: Index was out of range. Must be non - negative and
+                            // less than the size of the collection. (Parameter 'index') Actual value was 3047424.
                             for (int currentIndex = 0; currentIndex </*=*/ bitArray.Length; currentIndex += 16)
                             {
                                 //BitConverter.ToSingle()
@@ -947,10 +950,17 @@ array[index]);
                                 // Note: that I will need to change the type of the List<T> named realNumbers to double since both the
                                 // significand, and exponentiation I multiple to get a real number are doubles.
 
+                                DReverse dReverse = ReverseString;
+                                Int32 testExponent = Convert.ToInt32(exponentAsNumberString, fromBase: 2);
+                                Int32 test2Exponent = Convert.ToInt32(value: dReverse(exponentAsNumberString)/*(string)*/ /*exponentAsNumberString.Reverse<char>().ToString()*/, 2);
+
+                                // IEnumerble<char> is less derived than String so assignment compatibility does not work.
+                                string testIEnumerableToString = /*exponentAsNumberString.Reverse<char>().ToString();*/ dReverse(exponentAsNumberString);
+
                                 // Unbiased exponent, since the highest the exponent can be is 63, just subtract 63 from the exponent. This
                                 // makes the exponent always negative so that the decimal point always "floats" to the left, never to the
                                 // right.
-                                Int32 exponentInDecimalSystem = Convert.ToInt32(exponentAsNumberString, fromBase: 2) - 63;
+                                Int32 exponentInDecimalSystem = Convert.ToInt32(dReverse(exponentAsNumberString), fromBase: 2) - 63;
 
                                 double numericalValueOfFloatingPointRepresentationOfANumber = significand * Math.Pow(x: 2, y: exponentInDecimalSystem);
 
@@ -964,6 +974,7 @@ array[index]);
                         };
 
                         dPlaceHolder(bits/*, 0*/);
+                        pixelImageData = realNumbers.ToArray();
                     }
                 }
 
@@ -991,6 +1002,8 @@ array[index]);
 
             return seq.ElementAt<int>(index) + ConvertToNumberString(seq, index + 1);
         }
+
+        public delegate string DReverse(string str);
 
         // Todo: Use position of bytes to find out which chunk contains the bytes that represent the camera operator, e.g. Jane C B Gray.
         // Update: "Jane C B Gray" starts at index 24094 which means that the string "Jane C B Gray" is in chunk 5 which has a type of 10,
@@ -1170,6 +1183,18 @@ array[index]);
             }
 
             return new Tuple<string, string, String, String>(str1, str2, str3, str4);
+        }
+
+        public static string ReverseString(string str)
+        {
+            var strBuilder = new StringBuilder();
+
+            for (int index = str.Length - 1; index >= 0; index--)
+            {
+                strBuilder.Append(str[index]);
+            }
+
+            return strBuilder.ToString();
         }
 
         // Todo: Read and interpret laterality, and image data (, and may be contour data too if it is necessary). Store all image data
