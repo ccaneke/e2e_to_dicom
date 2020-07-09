@@ -9,10 +9,14 @@
     <Reference Include="AnonymizationLibrary">
       <HintPath>AnonymizationLibrary.dll</HintPath>
     </Reference>
+    <Reference Include="OpenCvSharp">
+      <HintPath>OpenCvSharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="fo-dicom.NetCore" Version="4.0.5" />
     <PackageReference Include="runtime.osx.10.10-x64.runtime.native.System.Security.Cryptography.OpenSsl" Version="4.3.3" />
     <PackageReference Include="System.Drawing.Common" Version="4.7.0" />
+    <PackageReference Include="runtime.osx.10.10-x64.CoreCompat.System.Drawing" Version="5.8.64" />
   </ItemGroup>
 </Project>
