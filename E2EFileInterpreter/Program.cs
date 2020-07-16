@@ -13,14 +13,15 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
 using System.Drawing.Drawing2D;
-//using System.Windows;
-//using System.Drawing;
+
 using System.Dynamic;
 
 using Randomizer = AnonymizationLibrary.Randomizer;
 
+
 namespace E2EFileInterpreter
 {
+    
     class Program
     {
         static Int64 position;
@@ -28,7 +29,7 @@ namespace E2EFileInterpreter
 
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
 
-        static string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/tmp/ASLAM01TAnonymized.E2E"*/;
+        static string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E";
 
         static int Given_name_entry_length { get; set; }
         static int Surname_entry_length { get; set; }
@@ -75,7 +76,7 @@ namespace E2EFileInterpreter
 
 
             
-            await foreach (var item in HeaderAsync(Program.filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, 0))
+            await foreach (var item in HeaderAsync(Program.filePath, 0))
             {
                 if (item is UInt16[])
                 {
@@ -97,7 +98,7 @@ array[index]);
             Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
 
             list.Clear();
-            await foreach (var item in MainDirectoryAsync(Program.filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/))
+            await foreach (var item in MainDirectoryAsync(Program.filePath))
             {
                 if (item is UInt16[])
                 {
@@ -125,14 +126,11 @@ array[index]);
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
             // test
-            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E"/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/;
+            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E";
 
             await TraverseListOfDirectoryChunks(mainDirectory.current, /*filePath*/Program.filePath);
 
             Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath/*filePath*/);
-
-            // Print test
-            //await PrintBytesInFileAsync(filePath);
 
             string patient_identifier = (String)chunks["chunk 47"]["patient_identifier"];
 
@@ -170,9 +168,7 @@ array[index]);
                 ((String)chunks["chunk 5"]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
                 pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
 
-            await CreateDicomAsync<string>(pseudo_given_name, anonymized_surname, anonymized_patient_identifier);
-            //await
-            //CreateDicomAsync<string>(pseudo_given_name, anonymized_surname, patientNumber: anonymized_patient_identifier);
+            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -221,7 +217,6 @@ array[index]);
 
                 Int32 num = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | (array[0]);
 
-                //yield return float.Parse(Encoding.UTF32.GetString(array)/*Encoding.UTF8.GetString(array)*/);
 
                 UInt32 testConverted = (UInt32)num;
                 UInt32 testConverted2 = (UInt32)(array[3] << 24) | (UInt32)(array[2] << 16) | (UInt32)(array[1] << 8) | array[0];
@@ -229,24 +224,12 @@ array[index]);
                 yield return (UInt32)num;
 
 
-                /*
-                int maxBytes = 54;
-
-                if(count > 1)
-                {
-                    maxBytes = 57;
-                }*/
-
+                
                 numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18 /*54*/ /*maxBytes*/);
                 array = new byte[numRead];
 
                 Array.Copy(buffer, array, length: numRead);
 
-                /*
-                 * Deprecated code
-                string utf16NumberString = Encoding.Unicode.GetString(array);
-
-                ushort utf16Number = UInt16.Parse(utf16NumberString);*/
 
                 UInt16 num2 = (ushort)((array[1] << 8) | (array[0]));
 
@@ -516,12 +499,12 @@ array[index]);
             return number;
         }
 
-        private static async Task</*Hashtable*/Dictionary<string, /*object*/Dictionary<string, object>>> ReadDataChunksAsync(string filePath)
+        private static async Task<Dictionary<string, Dictionary<string, object>>> ReadDataChunksAsync(string filePath)
         {
             
 
-            Dictionary<string, /*object*/Dictionary<string, object>> chunks =
-                                                                    new Dictionary<string, /*object*/ Dictionary<string, object>>();
+            Dictionary<string, Dictionary<string, object>> chunks =
+                                                                    new Dictionary<string, Dictionary<string, object>>();
 
             FileStream sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
             byte[] buffer = new byte[0x1000];
@@ -690,9 +673,6 @@ array[index]);
                 }
                 else if (type == 0x40000000)
                 {
-                    
-
-                    
                     UInt32 sizeOfImage = await GetU32EntryAsync(sourceStream, buffer);
                     UInt32 typeOfImage = await GetU32EntryAsync(sourceStream, buffer);
                     uint unknownInImageData = await GetU32EntryAsync(sourceStream, buffer);
@@ -700,10 +680,6 @@ array[index]);
                     UInt32 height = await GetU32EntryAsync(sourceStream, buffer);
                     int test4 = (int)height * (int)width;
                     int test5 = (int)(height * width);
-                    int typeOfImageTest1 = 0x02010201; // fundus
-                    int typeOfImageTest2 = 0x02200201; // tomogram
-                    var typeOfImageHexDataTest = 0x02010201; // fundus
-
                     
                     imageWidth = width;
                     imageHeight = height;
@@ -725,7 +701,6 @@ array[index]);
                     } else
                     {
 
-                        
                         buffer = new byte[0x100000];
                         numRead = await sourceStream.ReadAsync(buffer, 0, (int)(height * width) * 2);
                         byte[] tomogramImageData = new byte[numRead];
@@ -743,12 +718,10 @@ array[index]);
                         int countOfStacks = 0;
 
                         
-                        DPlaceHolder<BitArray/*, int*//*, Object*/> dPlaceHolder = null;
+                        DPlaceHolder<BitArray> dPlaceHolder = null;
 
-                        dPlaceHolder = (BitArray bitArray/*,*/ /*int takes*/ /*int currentIndex*/) =>
+                        dPlaceHolder = (BitArray bitArray) =>
                         {
-
-                            
                             for (int currentIndex = 0; currentIndex </*=*/ bitArray.Length; currentIndex += 16)
                             {
                                 
@@ -767,10 +740,8 @@ array[index]);
 
                                 }
 
-                                // 10 bit mantissa
                                 bool[] mantissa = new bool[10];
 
-                                // 6 bit exponent
                                 bool[] exponent = new bool[6];
 
                                 for (int i = 0; i < floatingPointRepresentation.Length; i++)
@@ -814,13 +785,11 @@ array[index]);
 
                                 DReverse dReverse = ReverseString;
                                 Int32 testExponent = Convert.ToInt32(exponentAsNumberString, fromBase: 2);
-                                Int32 test2Exponent = Convert.ToInt32(value: dReverse(exponentAsNumberString)/*(string)*/ /*exponentAsNumberString.Reverse<char>().ToString()*/, 2);
+                                Int32 test2Exponent = Convert.ToInt32(value: dReverse(exponentAsNumberString), 2);
 
-                                string testIEnumerableToString = /*exponentAsNumberString.Reverse<char>().ToString();*/ dReverse(exponentAsNumberString);
+                                string testIEnumerableToString = dReverse(exponentAsNumberString);
 
-
-                                
-                                Int32 exponentInDecimalSystem = Convert.ToInt32(dReverse(exponentAsNumberString) /*exponentAsNumberString*/, fromBase: 2) - 63;
+                                Int32 exponentInDecimalSystem = Convert.ToInt32(dReverse(exponentAsNumberString), fromBase: 2) - 63;
 
                                 double numericalValueOfFloatingPointRepresentationOfANumber = significand * Math.Pow(x: 2, y: exponentInDecimalSystem);
 
@@ -835,9 +804,6 @@ array[index]);
 
                         rawTomogramSliceImages.Add(realNumbers.ToArray<double>());
                         pixelImageData = realNumbers.ToArray();
-                        
-
-                        
 
                         dimensionsOfTomogramSliceImages.Add(new ValueTuple<uint, UInt32>(width, height));
                     }
@@ -849,9 +815,6 @@ array[index]);
 
             Raw_Fundus_Images_As_Array = rawFundusImages.ToArray();
 
-            
-
-
             foreach (double[] element in rawTomogramSliceImages)
             {
                 double[] mappedDecimalValues = new double[element.Length];
@@ -861,6 +824,7 @@ array[index]);
                     mappedDecimalValues[index] = d;
                     index += 1;
                 }
+                // Test
                 int test = index;
 
                 MappedDecimalValuesForTomogramSlices.Add(mappedDecimalValues);
@@ -869,13 +833,10 @@ array[index]);
             int testRun = 254;
             byte testRun2 = 254;
 
-            
             int testRun3 = Convert.ToInt32(testRun2);
 
             
             byte testRun4 = Convert.ToByte(value: testRun);
-
-            
 
             DecimalValuesMappedBetween0And255 = MappedDecimalValuesForTomogramSlices.ToArray<double[]>();
 
@@ -901,8 +862,6 @@ array[index]);
         public delegate string DReverse(string str);
 
 
-        
-
         public static IEnumerable<double> MapToByte(double[] doubles)
         {
             foreach (double d in doubles)
@@ -911,6 +870,13 @@ array[index]);
             }
         }
 
+
+        public static async Task PrintBytesInFileAsync(string filePath)
+        {
+            FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+
+            byte[] buffer = new byte[0x1000000];
+        }
 
         private static UInt16[] ToUInt16Array(byte[] bytes)
         {
@@ -931,10 +897,9 @@ array[index]);
             Tuple<string, string, String, String> quadruple = PadWithNullCharacters(str1, str2, str3, str4);
 
 
-            string newFile = /*GetDirectory(filePath)*/"/tmp/" + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+            string newFile = "/tmp/" + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
 
-            File.Copy(sourceFileName: filePath, destFileName: /*GetDirectory(filePath) +
-                GetFileName(filePath).Insert(startIndex: GetFileName(filePath).Length - 4, value: "Copy")*/newFile);
+            File.Copy(sourceFileName: filePath, destFileName: newFile);
 
             string test2 = $"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile;
 
@@ -944,8 +909,7 @@ array[index]);
             Console.WriteLine("HERE IS THE VALUE OF THE VARIABLE ARGUMENT:");
             Console.WriteLine(argument);
 
-            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: /*"sed"*/"perl"/*"/usr/bin/perl"*/, /*$"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; " +
-                $"s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile*//*test*/argument);
+            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: "perl", argument);
 
             processStartInfo.UseShellExecute = true;
 
@@ -990,7 +954,6 @@ array[index]);
 
         public static Tuple<string, String, string, string> PadWithNullCharacters(string str1, string str2, String str3, string str4)
         {
-            // Positional prameters must be in the order patient identifer, given name, surname, and full name of operator
             UInt32 numTrailingNullCharsInNewPatientIdentifierEntry = (UInt32)(Patient_identifier_entry_length - str1.Length);
             Int32 numTrailingNullCharsInNewGivenNameEntry = Given_name_entry_length - str2.Length;
             int numTrailingNullCharsInNewSurnameEntry = Surname_entry_length - str3.Length;
@@ -1031,45 +994,27 @@ array[index]);
             return strBuilder.ToString();
         }
 
-        public static /*void*/ async Task CreateDicomAsync<A>(/*string*/A firstName, A/*string*/ lastName, /*string*/ A patientNumber)
+        public static void CreateDicom(string firstName, string lastName, string patientNumber)
         {
-
-            /*DicomDataset dicomElements = new DicomDataset(internalTransferSyntax: DicomTransferSyntax.ExplicitVRBigEndian)
+            string directory = "directory";
+            for (int index = 0; index < DecimalValuesMappedBetween0And255.Length; index++)
             {
-                {DicomTag.DoubleFloatPixelData, pixelImageData },
-                {DicomTag.PatientName, $"{firstName} {lastName}" },
-                {DicomTag.PatientID, patientNumber },
-                {DicomTag.SOPClassUID, DicomUID.SecondaryCaptureImageStorage},
-                {DicomTag.SOPInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID()},
-                {DicomTag.StudyInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID()},
-                {DicomTag.SeriesInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID() }
-            };*/
+                directory = ImageFromTomogramSliceImageBytes(index);
+            }
 
-            //DicomDataset dicomElements = new DicomDataset(/*internalTransferSyntax: DicomTransferSyntax.ExplicitVRBigEndian*/)
-            //{
-            //    {DicomTag.PixelData, Raw_Fundus_Images_As_Array[0]},
-            //    {DicomTag.PatientName, $"{firstName} {lastName}" },
-            //    {DicomTag.PatientID, patientNumber },
-            //    {DicomTag.SOPClassUID, DicomUID.SecondaryCaptureImageStorage},
-            //    {DicomTag.SOPInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID()},
-            //    {DicomTag.StudyInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID()},
-            //    {DicomTag.SeriesInstanceUID, DicomUIDGenerator.GenerateDerivedFromUUID() }
-            //};
+            for (int index = 0; index < Raw_Fundus_Images_As_Array.Length; index++)
+            {
+                ImageFromFundusImageBytes(index);
+            }
 
-            //DicomFile dicomFile = new DicomFile(dataset: dicomElements);
+            BitmapToDicom.ImportImages(directory, firstName, lastName, patientNumber);
+        }
 
-            //await dicomFile.SaveAsync("/tmp/convertedE2E.dcm");
-
+        public static string ImageFromTomogramSliceImageBytes(int index)
+        {
             
-
-            MemoryStream ms = new MemoryStream(Raw_Fundus_Images_As_Array[0]);
-            
-            MemoryStream ms2 = new MemoryStream();
-            await ms2.WriteAsync(Raw_Fundus_Images_As_Array[0], 0, Raw_Fundus_Images_As_Array[0].Length);
-
-            
-            int width = (int) dimensionsOfTomogramSliceImages[0].Item1/*imageWidth*//*100*/;
-            int height = (int) dimensionsOfTomogramSliceImages[0].Item2/*imageHeight*//*100*/;
+            int width = (int)dimensionsOfTomogramSliceImages[index].Item1;
+            int height = (int)dimensionsOfTomogramSliceImages[index].Item2;
             var output = new Bitmap(width: width, height: height);
 
 
@@ -1078,56 +1023,75 @@ array[index]);
             DMovingWindow createTomogramImage = MovingWindow;
 
             double testRun = 3.0;
-            byte testRun2 = (byte) testRun;
+            byte testRun2 = (byte)testRun;
             double[] testRun3 = new double[100];
             
-
             dynamic dyn = new ExpandoObject();
-            dyn.ArrayOfImageData = DecimalValuesMappedBetween0And255 /*scaledNumbers.ToArray()*/;
+            dyn.ArrayOfImageData = DecimalValuesMappedBetween0And255;
 
+            createTomogramImage(output, index, dyn);
 
+            var tomogramSliceImageFile = $"/tmp/images/tomogramSliceImage.bmp";
+            Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
+            resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
 
-            createTomogramImage(output, 0, /*DecimalValuesMappedBetween0And255*/dyn);
+            string directory = tomogramSliceImageFile.Remove(11);
 
+            return directory;
+        }
 
-            output.Save("/tmp/tomogram-image-slice.bmp", ImageFormat.Bmp);
+        public static string ImageFromFundusImageBytes(int index)
+        {
 
-            int fundusImageWidth = (int)dimensionsOfFundusImages[0].Item1;
-            int fundusImageHeight = (int)dimensionsOfFundusImages[0].Item2;
+            int fundusImageWidth = (int)dimensionsOfFundusImages[index].Item1;
+            int fundusImageHeight = (int)dimensionsOfFundusImages[index].Item2;
 
             dynamic propertyBag = new ExpandoObject();
 
             propertyBag.ArrayOfImageData = Raw_Fundus_Images_As_Array/*[0]*/;
 
+            int width = (int) dimensionsOfFundusImages[index].Item1;
+            int height = (int)dimensionsOfFundusImages[index].Item2;
 
-            width = (int) dimensionsOfFundusImages[0].Item1;
-            height = (int)dimensionsOfFundusImages[0].Item2;
-
-            
-            Bitmap fundusBitmap = new Bitmap(width, height);
+            Bitmap fundusBitmap = new Bitmap(width, height/*, PixelFormat.Format24bppRgb*/);
 
             DMovingWindow createFundusImage = MovingWindowFundus;
 
-            createFundusImage(fundusBitmap, 0, propertyBag);
+            createFundusImage(fundusBitmap, index, propertyBag);
 
-            fundusBitmap.Save("/tmp/fundus_image.bmp", ImageFormat.Bmp);
+            var fundusImageFile = $"/tmp/images/fundusImage.bmp";
+            Bitmap resizedFundusImage = ResizeImage(fundusBitmap, 768, 768);
+            resizedFundusImage.Save(fundusImageFile, ImageFormat.Bmp);
 
+            string directory = fundusImageFile.Replace("/fundusImage.bmp", "");
+
+            return directory;
         }
 
-        public delegate void DMovingWindow(Bitmap bitmap, int index, /*byte[][] arrayOfImageData*/dynamic obj);
 
-        public static void MovingWindow(Bitmap bitmap, int index, /*byte[][] arrayOfImageData*/dynamic obj)
+        public delegate void DMovingWindow(Bitmap bitmap, int index, dynamic obj);
+
+        public static void MovingWindow(Bitmap bitmap, int index, dynamic obj)
         {
             
 
             
 
-            obj.ArrayOfImageData[0][107704] -= 1;
+            foreach(double[] array in obj.ArrayOfImageData)
+            {
+                uint indexOfInnerArray = 0;
+                foreach(double d in array)
+                {
+                    if (d > 255)
+                    {
+                        obj.ArrayOfImageData[index][indexOfInnerArray] -= 1;
+                    }
+                    indexOfInnerArray += 1;
+                }
+            }
 
             int n = 1;
-
-
-            /*uint*/ int step = 0;
+            int step = 0;
             int count = 0;
 
             for (int x = 0; x < bitmap.Width; x++, n++)
@@ -1148,18 +1112,6 @@ array[index]);
             int n = 1;
             int step = 0;
 
-            
-            //for (int x = 0; x < bitmap.Width; x++, n++)
-            //{
-            //    for (int y = 0, position1 = step, position2 = step + 1, position3 = step + 2; /*position1 + 2*/ position3 < bitmap.Height /** 3*/ * n; y++, position1 += 3, position2 += 3, position3 += 3)
-            //    {
-            //        Color color = Color.FromArgb(obj.ArrayOfImageData[index][position1], obj.ArrayOfImageData[index][position2], obj.ArrayOfImageData[index][position3]);
-            //        bitmap.SetPixel(x, y, color);
-            //    }
-
-            //    step += bitmap.Height /** 3*/;
-            //}
-
             for (int x = 0; x < bitmap.Width; x++, n++)
             {
                 for (int y = 0, position1 = step; position1 < bitmap.Height * n; y++, position1++)
@@ -1170,25 +1122,15 @@ array[index]);
 
                 step += bitmap.Height;
             }
-
         }
 
-        
 
-        public static void Print(byte[] bytes, int numToPrint)
+        public static Bitmap ResizeImage(Bitmap image, int width, int height)
         {
-            Console.WriteLine();
-            Console.WriteLine("Printing bytes:");
-            for (int index = 0; index < numToPrint; index++)
-            {
-                Console.WriteLine(bytes[index]);
-            }
-
-            Console.WriteLine("End of printing bytes");
-            Console.WriteLine();
+            Size size = new Size(width, height);
+            Bitmap resized = new Bitmap(image, size);
+            return resized;
         }
 
-        
-        
     }
 }
