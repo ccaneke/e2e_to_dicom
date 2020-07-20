@@ -72,6 +72,8 @@ namespace E2EFileInterpreter
 
         static async Task Main(string[] args)
         {
+            // Todo: First check if a file of the same name as the .E2E file but with Copy appended to it exists, then delete it before
+            // the program continues.
             List<object> list = new List<object>();
 
 
@@ -132,7 +134,12 @@ array[index]);
 
             Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath/*filePath*/);
 
-            string patient_identifier = (String)chunks["chunk 47"]["patient_identifier"];
+            // Done: The patient_identifier will not always be in chunk 47, so figure out how to find out which chunk (i.e. dictionary)
+            // contains the "patient_identifier" key, may be I could filter with LINQ.
+
+            string patientInfoChunk = FindChunk(ChunkType.patientInfo, chunks);
+
+            string patient_identifier = (String)chunks[patientInfoChunk]["patient_identifier"];
 
             Randomizer randomizer = new Randomizer(patient_identifier.Replace("\0", string.Empty));
             randomizer.shuffleCharacters();
@@ -161,11 +168,13 @@ array[index]);
 
             patient_identifier = patient_identifier.Replace("\0", "\\0");
 
+            var operatorNameChunk = FindChunk(ChunkType.operatorInfo, chunks);
+
             // Calls to Replace() method must come after the four properties ending with length are assigned a value, in order to
             // avoid breaking the PadWithNullCharacters method.
-            SearchAndReplace(patient_identifier, ((string)chunks["chunk 47"]["given_name"]).Replace("\0", "\\0"),
-                ((String)chunks["chunk 47"]["surname"]).Replace("\0", "\\0"),
-                ((String)chunks["chunk 5"]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
+            SearchAndReplace(patient_identifier, ((string)chunks[patientInfoChunk]["given_name"]).Replace("\0", "\\0"),
+                ((String)chunks[patientInfoChunk]["surname"]).Replace("\0", "\\0"),
+                ((String)chunks[/*"chunk 5"*/operatorNameChunk]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
                 pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
 
             CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier);
@@ -1031,6 +1040,7 @@ array[index]);
 
             createTomogramImage(output, index, dyn);
 
+            // Todo: Create images directory before trying to save images to it
             var tomogramSliceImageFile = $"/tmp/images/tomogramSliceImage.bmp";
             Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
             resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
@@ -1058,7 +1068,7 @@ array[index]);
             DMovingWindow createFundusImage = MovingWindowFundus;
 
             createFundusImage(fundusBitmap, index, propertyBag);
-
+            //Todo: If operating system is windows use a different path, otherwise if operating system is unix use normal path
             var fundusImageFile = $"/tmp/images/fundusImage.bmp";
             Bitmap resizedFundusImage = ResizeImage(fundusBitmap, 768, 768);
             resizedFundusImage.Save(fundusImageFile, ImageFormat.Bmp);
@@ -1130,6 +1140,51 @@ array[index]);
             Size size = new Size(width, height);
             Bitmap resized = new Bitmap(image, size);
             return resized;
+        }
+
+        public static string FindChunk(ChunkType chunkType/*string searchTerm*/, Dictionary<string, Dictionary<string, object>> chunks)
+        {
+            string chunkName;
+            switch (chunkType/*searchTerm*/)
+            {
+                case ChunkType.patientInfo/*"patient info"*/:
+                    {
+                        IEnumerable<string> chunkNameQuery =
+                            from chunk in chunks
+                            from entry in chunk.Value
+                            where entry.Key.SequenceEqual<char>("patient_identifier")
+                            select chunk.Key;
+
+                        chunkName = chunkNameQuery.Single();
+
+                        return chunkName;
+                    }
+
+                case ChunkType.operatorInfo:
+                    {
+                        IEnumerable<string> queryOperatorName =
+                            from kvp in chunks
+                            where kvp.Value.ContainsKey(key: "full_name_of_operator")/*Contains(new KeyValuePair<string, object>(key: "", va))*/
+                            select kvp.Key;
+
+                        string operatorName = queryOperatorName.Single<string>();
+
+                        return operatorName;
+                    }
+
+                default:
+                    {
+                        chunkName = "Chunk not found";
+                        break;
+                    }
+                    
+            }
+            return chunkName;
+        }
+
+        public enum ChunkType
+        {
+            patientInfo, operatorInfo
         }
 
     }
