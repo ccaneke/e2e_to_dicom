@@ -29,7 +29,7 @@ namespace E2EFileInterpreter
 
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
 
-        static string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E";
+        static string filePath; /*= "/Users/christopheraneke/Downloads/ASLAM01T.E2E";*/
 
         static int Given_name_entry_length { get; set; }
         static int Surname_entry_length { get; set; }
@@ -70,10 +70,30 @@ namespace E2EFileInterpreter
 
         private static List<UInt16[]> scaledNumbers = new List<UInt16[]>();
 
+        private static string imagesDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\temp\\images" : "/tmp/images";
+
+        private static readonly string tempDirectory = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "/tmp" : "\\temp";
+        // arg[0] should be source file, arg[1] images directory
         static async Task Main(string[] args)
         {
-            // Todo: First check if a file of the same name as the .E2E file but with Copy appended to it exists, then delete it before
+            // First check if a file of the same name as the .E2E file but with Copy appended to it exists, then delete it before
             // the program continues.
+            string copy = $"{tempDirectory}{GetFileName(args[0]).Insert(startIndex: GetFileName(args[0]).Length - 4, value: "Copy")}";
+            if (File.Exists(path: copy))
+            {
+                File.Delete(copy);
+            }
+
+            try
+            {
+                new DirectoryInfo(path: args[1]).GetFiles();
+            } catch (DirectoryNotFoundException)
+            {
+                Directory.CreateDirectory(path: args[1]);
+            }
+
+            filePath = args[0];
+
             List<object> list = new List<object>();
 
 
@@ -127,9 +147,6 @@ array[index]);
 
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
-            // test
-            string filePath = "/Users/christopheraneke/Downloads/ASLAM01T.E2E";
-
             await TraverseListOfDirectoryChunks(mainDirectory.current, /*filePath*/Program.filePath);
 
             Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath/*filePath*/);
@@ -177,7 +194,7 @@ array[index]);
                 ((String)chunks[/*"chunk 5"*/operatorNameChunk]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
                 pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
 
-            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier);
+            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -906,7 +923,7 @@ array[index]);
             Tuple<string, string, String, String> quadruple = PadWithNullCharacters(str1, str2, str3, str4);
 
 
-            string newFile = "/tmp/" + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+            string newFile = /*"/tmp/"*/ tempDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
 
             File.Copy(sourceFileName: filePath, destFileName: newFile);
 
@@ -952,6 +969,10 @@ array[index]);
             for (int index = filePath.Length - 1; index >= 0; index--)
             {
                 if (filePath[index] == '/')
+                {
+                    fileName = filePath.Substring(startIndex: index + 1);
+                    break;
+                } else if (filePath[index] == '\\')
                 {
                     fileName = filePath.Substring(startIndex: index + 1);
                     break;
@@ -1003,23 +1024,23 @@ array[index]);
             return strBuilder.ToString();
         }
 
-        public static void CreateDicom(string firstName, string lastName, string patientNumber)
+        public static void CreateDicom(string firstName, string lastName, string patientNumber, string imagesdirectory)
         {
-            string directory = "directory";
+            //string directory = "directory";
             for (int index = 0; index < DecimalValuesMappedBetween0And255.Length; index++)
             {
-                directory = ImageFromTomogramSliceImageBytes(index);
+                ImageFromTomogramSliceImageBytes(index, imagesdirectory);
             }
 
             for (int index = 0; index < Raw_Fundus_Images_As_Array.Length; index++)
             {
-                ImageFromFundusImageBytes(index);
+                ImageFromFundusImageBytes(index, imagesdirectory);
             }
 
-            BitmapToDicom.ImportImages(directory, firstName, lastName, patientNumber);
+            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber);
         }
 
-        public static string ImageFromTomogramSliceImageBytes(int index)
+        public static void /*string*/ ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
         {
             
             int width = (int)dimensionsOfTomogramSliceImages[index].Item1;
@@ -1041,16 +1062,16 @@ array[index]);
             createTomogramImage(output, index, dyn);
 
             // Todo: Create images directory before trying to save images to it
-            var tomogramSliceImageFile = $"/tmp/images/tomogramSliceImage.bmp";
+            // For unix directory should end with /
+            var tomogramSliceImageFile = $"{imagesDirectory}tomogramSliceImage{index++}.bmp";
             Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
             resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
 
-            string directory = tomogramSliceImageFile.Remove(11);
 
-            return directory;
+            //return directory;
         }
 
-        public static string ImageFromFundusImageBytes(int index)
+        public static void/*string*/ ImageFromFundusImageBytes(int index, string imagesDirectory)
         {
 
             int fundusImageWidth = (int)dimensionsOfFundusImages[index].Item1;
@@ -1069,13 +1090,13 @@ array[index]);
 
             createFundusImage(fundusBitmap, index, propertyBag);
             //Todo: If operating system is windows use a different path, otherwise if operating system is unix use normal path
-            var fundusImageFile = $"/tmp/images/fundusImage.bmp";
+            var fundusImageFile = $"{imagesDirectory}fundusImage{index +=1}.bmp";
             Bitmap resizedFundusImage = ResizeImage(fundusBitmap, 768, 768);
             resizedFundusImage.Save(fundusImageFile, ImageFormat.Bmp);
 
-            string directory = fundusImageFile.Replace("/fundusImage.bmp", "");
+            //string directory = fundusImageFile.Replace("/fundusImage.bmp", "");
 
-            return directory;
+            //return directory;
         }
 
 
@@ -1094,7 +1115,10 @@ array[index]);
                 {
                     if (d > 255)
                     {
-                        obj.ArrayOfImageData[index][indexOfInnerArray] -= 1;
+                        obj.ArrayOfImageData[index][indexOfInnerArray] /*-= 1*/ = 255;
+                    } else if (d < 0)
+                    {
+                        obj.ArrayOfImageData[index][indexOfInnerArray] = 0;
                     }
                     indexOfInnerArray += 1;
                 }
