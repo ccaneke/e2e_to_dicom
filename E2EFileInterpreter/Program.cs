@@ -70,15 +70,16 @@ namespace E2EFileInterpreter
 
         private static List<UInt16[]> scaledNumbers = new List<UInt16[]>();
 
-        private static string imagesDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\temp\\images" : "/tmp/images";
+        private static string imagesDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\temp\\images2\\" : "/tmp/images2/";
 
-        private static readonly string tempDirectory = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "/tmp" : "\\temp";
-        // arg[0] should be source file, arg[1] images directory
+        private static readonly string tempDirectory = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "/tmp/" : @"\temp\";
+        // arg[0] should be source file, arg[1] images directory. Make sure images directory path ends with /, or make the program handle
+        // it.
         static async Task Main(string[] args)
         {
             // First check if a file of the same name as the .E2E file but with Copy appended to it exists, then delete it before
             // the program continues.
-            string copy = $"{tempDirectory}{GetFileName(args[0]).Insert(startIndex: GetFileName(args[0]).Length - 4, value: "Copy")}";
+            string copy = $"{tempDirectory}{GetFileName(args[0] /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/).Insert(startIndex: GetFileName(args[0]/*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/).Length - 4, value: "Copy")}";
             if (File.Exists(path: copy))
             {
                 File.Delete(copy);
@@ -86,13 +87,13 @@ namespace E2EFileInterpreter
 
             try
             {
-                new DirectoryInfo(path: args[1]).GetFiles();
+                new DirectoryInfo(path: args[1]/*"/tmp/images6"*/).GetFiles();
             } catch (DirectoryNotFoundException)
             {
-                Directory.CreateDirectory(path: args[1]);
+                Directory.CreateDirectory(path: args[1]/*"/tmp/images6"*/);
             }
 
-            filePath = args[0];
+            filePath = args[0] /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/;
 
             List<object> list = new List<object>();
 
@@ -194,7 +195,7 @@ array[index]);
                 ((String)chunks[/*"chunk 5"*/operatorNameChunk]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
                 pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
 
-            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]);
+            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]/*"/tmp/images6"*/);
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -1037,7 +1038,7 @@ array[index]);
                 ImageFromFundusImageBytes(index, imagesdirectory);
             }
 
-            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber);
+            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, tempDirectory);
         }
 
         public static void /*string*/ ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
@@ -1060,10 +1061,10 @@ array[index]);
             dyn.ArrayOfImageData = DecimalValuesMappedBetween0And255;
 
             createTomogramImage(output, index, dyn);
-
+            Console.WriteLine("THE INDEX IS "+index);
             // Todo: Create images directory before trying to save images to it
             // For unix directory should end with /
-            var tomogramSliceImageFile = $"{imagesDirectory}tomogramSliceImage{index++}.bmp";
+            var tomogramSliceImageFile = $"{imagesDirectory}tomogramSliceImage{/*index += 1*/++index/*index++*/}.bmp";
             Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
             resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
 
