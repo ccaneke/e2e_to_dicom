@@ -1060,6 +1060,13 @@ array[index]);
             dynamic dyn = new ExpandoObject();
             dyn.ArrayOfImageData = DecimalValuesMappedBetween0And255;
 
+            int i = 0;
+            do
+            {
+                dyn.ArrayOfImageData[i] = InvertIntensity(dyn.ArrayOfImageData[i]);
+                i++;
+            } while (i < dyn.ArrayOfImageData.Length);
+
             createTomogramImage(output, index, dyn);
             Console.WriteLine("THE INDEX IS "+index);
             // Todo: Create images directory before trying to save images to it
@@ -1210,6 +1217,19 @@ array[index]);
         public enum ChunkType
         {
             patientInfo, operatorInfo
+        }
+
+        public static double[]/*void*/ InvertIntensity(double[] imageData)
+        {
+            IEnumerable<double> queryElements =
+                from d in imageData
+                let inverted = 255 - d
+                select inverted;
+
+            // Renamed from invertedGreyScale
+            double[] invertedIntensities = queryElements.ToArray();
+
+            return invertedIntensities;
         }
 
     }
