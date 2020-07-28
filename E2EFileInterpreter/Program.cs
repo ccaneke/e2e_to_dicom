@@ -18,6 +18,7 @@ using System.Dynamic;
 
 using Randomizer = AnonymizationLibrary.Randomizer;
 
+using System.Text.Encodings;
 
 namespace E2EFileInterpreter
 {
@@ -29,7 +30,7 @@ namespace E2EFileInterpreter
 
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
 
-        static string filePath; /*= "/Users/christopheraneke/Downloads/ASLAM01T.E2E";*/
+        static string filePath;
 
         static int Given_name_entry_length { get; set; }
         static int Surname_entry_length { get; set; }
@@ -73,13 +74,11 @@ namespace E2EFileInterpreter
         private static string imagesDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\temp\\images2\\" : "/tmp/images2/";
 
         private static readonly string tempDirectory = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "/tmp/" : @"\temp\";
-        // arg[0] should be source file, arg[1] images directory. Make sure images directory path ends with /, or make the program handle
-        // it.
-        static async Task Main(string[] args)
+
+        // arg[0] should be source file, arg[1] images directory. Make sure images directory path ends with /.
+        private static async Task<Int32> Main(string[] args)
         {
-            // First check if a file of the same name as the .E2E file but with Copy appended to it exists, then delete it before
-            // the program continues.
-            string copy = $"{tempDirectory}{GetFileName(args[0] /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/).Insert(startIndex: GetFileName(args[0]/*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/).Length - 4, value: "Copy")}";
+            string copy = $"{tempDirectory}{GetFileName(args[0]).Insert(startIndex: GetFileName(args[0]).Length - 4, value: "Copy")}";
             if (File.Exists(path: copy))
             {
                 File.Delete(copy);
@@ -87,34 +86,18 @@ namespace E2EFileInterpreter
 
             try
             {
-                new DirectoryInfo(path: args[1]/*"/tmp/images6"*/).GetFiles();
+                new DirectoryInfo(args[1]).GetFiles();
             } catch (DirectoryNotFoundException)
             {
-                Directory.CreateDirectory(path: args[1]/*"/tmp/images6"*/);
+                Directory.CreateDirectory(args[1]);
             }
 
-            filePath = args[0] /*"/Users/christopheraneke/Downloads/ASLAM01T.E2E"*/;
+            filePath = args[0];
 
             List<object> list = new List<object>();
-
-
             
             await foreach (var item in HeaderAsync(Program.filePath, 0))
             {
-                if (item is UInt16[])
-                {
-                    Action<ushort[]> print = (ushort[] array) =>
-                    {
-                        for (int index = 0; index < array.Length; index++) Console.WriteLine(
-array[index]);
-                    };
-
-                    print(item as ushort[]);
-                }
-                else
-                    Console.WriteLine(item/*nameof(item)*/);
-                //Console.WriteLine(item is ushort[]);
-
                 list.Add(item);
             }
 
@@ -123,20 +106,6 @@ array[index]);
             list.Clear();
             await foreach (var item in MainDirectoryAsync(Program.filePath))
             {
-                if (item is UInt16[])
-                {
-                    Action<ushort[]> print = (numbers) =>
-                    {
-                        foreach (ushort number in numbers)
-                        {
-                            Console.WriteLine(number);
-                        }
-                    };
-                }
-                else
-                {
-                    Console.WriteLine(item);
-                }
 
                 list.Add(item);
 
@@ -144,16 +113,11 @@ array[index]);
 
             object obj = new MainDirectory();
 
-            
-
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
-            await TraverseListOfDirectoryChunks(mainDirectory.current, /*filePath*/Program.filePath);
+            await TraverseListOfDirectoryChunks(mainDirectory.current, Program.filePath);
 
-            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath/*filePath*/);
-
-            // Done: The patient_identifier will not always be in chunk 47, so figure out how to find out which chunk (i.e. dictionary)
-            // contains the "patient_identifier" key, may be I could filter with LINQ.
+            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath);
 
             string patientInfoChunk = FindChunk(ChunkType.patientInfo, chunks);
 
@@ -184,18 +148,18 @@ array[index]);
 
             string anonymized_full_name_of_operator = "Mrs Camera Operator";
 
-            patient_identifier = patient_identifier.Replace("\0", "\\0");
-
             var operatorNameChunk = FindChunk(ChunkType.operatorInfo, chunks);
 
             // Calls to Replace() method must come after the four properties ending with length are assigned a value, in order to
             // avoid breaking the PadWithNullCharacters method.
-            SearchAndReplace(patient_identifier, ((string)chunks[patientInfoChunk]["given_name"]).Replace("\0", "\\0"),
-                ((String)chunks[patientInfoChunk]["surname"]).Replace("\0", "\\0"),
-                ((String)chunks[/*"chunk 5"*/operatorNameChunk]["full_name_of_operator"]).Replace("\0", "\\0"), anonymized_patient_identifier,
-                pseudo_given_name, anonymized_surname, anonymized_full_name_of_operator);
 
-            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]/*"/tmp/images6"*/);
+            Substitute(filePath, patient_identifier,(string) chunks[patientInfoChunk]["given_name"], (string) chunks[patientInfoChunk]["surname"],
+                (String)chunks[operatorNameChunk]["full_name_of_operator"], anonymized_patient_identifier, pseudo_given_name,
+                anonymized_surname, anonymized_full_name_of_operator);
+
+            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]);
+
+            return (int) ExitCode.success;
         }
 
         public static async IAsyncEnumerable<object> HeaderAsync(string filePath, Int64 positionWithinStream)
@@ -215,16 +179,6 @@ array[index]);
 
                 Array.Copy(buffer, array, length: numRead);
 
-                
-                Char[] testArray = Encoding.Unicode.GetChars(array);
-                Char[] testArray2 = Encoding.BigEndianUnicode.GetChars(array);
-                Char[] testArray3 = Encoding.ASCII.GetChars(array);
-
-                
-                Char[] testArray4 = Encoding.UTF8.GetChars(array);
-                Char[] testArray5 = Encoding.UTF32.GetChars(array);
-                
-
                 yield return Encoding.UTF8.GetString(array) /*Encoding.ASCII.GetString(array)*/;
 
                 numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 4);
@@ -232,25 +186,14 @@ array[index]);
 
                 Array.Copy(buffer, array, length: 4);
 
-                //byte[] test = new byte[4];
                 char[] test2 = Encoding.UTF8.GetChars(array);
 
-                // Test.
                 string decodedWithUTF8 = Encoding.UTF8.GetString(array);
                 string decodedText = Encoding.UTF32.GetString(array);
-                int a = 'd';
-                float b = 'd';
-                UInt32 c = 'd';
 
                 Int32 num = (array[3] << 24) | (array[2] << 16) | (array[1] << 8) | (array[0]);
 
-
-                UInt32 testConverted = (UInt32)num;
-                UInt32 testConverted2 = (UInt32)(array[3] << 24) | (UInt32)(array[2] << 16) | (UInt32)(array[1] << 8) | array[0];
-                UInt32 testConverted3 = (UInt32)((array[3] << 24) | (array[2] << 16) | (array[1] << 8) | array[0]);
                 yield return (UInt32)num;
-
-
                 
                 numRead = await dataSourceStream.ReadAsync(buffer, offset: 0, 18 /*54*/ /*maxBytes*/);
                 array = new byte[numRead];
@@ -260,11 +203,7 @@ array[index]);
 
                 UInt16 num2 = (ushort)((array[1] << 8) | (array[0]));
 
-
-                
                 UInt16[] u16Array = new ushort[9];
-
-                
 
                 Action<byte[], UInt16[]> convert = (arr, arr2) =>
                 {
@@ -280,9 +219,6 @@ array[index]);
 
                 yield return u16Array;
 
-                
-
-                
                 numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 2 /*bytesToRead*/);
 
                 array = new byte[numRead];
@@ -291,11 +227,7 @@ array[index]);
 
                 UInt16 positiveNumber = (UInt16)((array[1] << 8) | array[0]);
 
-
-                
-
                 yield return positiveNumber;
-                
 
                 position = dataSourceStream.Position;
             }
@@ -307,7 +239,7 @@ array[index]);
         {
             
 
-            await foreach (var item in HeaderAsync(filePath/*"/tmp/ASLAM01TAnonymized.E2E"*//*"/Users/christopheraneke/Downloads/SAMPLE_OCT.E2E"*/, position /*positionWithinStream*//*Program.position + 36*/))
+            await foreach (var item in HeaderAsync(filePath, position))
             {
                 yield return item;
             }
@@ -395,12 +327,12 @@ array[index]);
 
             do
             {
-                long currentPositionWithinStream = sourceStream.Seek(/*mainDirectory.current*/ currentPosition /*mainDirectory.numEntries*/, origin: SeekOrigin.Begin);
+                long currentPositionWithinStream = sourceStream.Seek(currentPosition, SeekOrigin.Begin);
 
                 long positionTest = sourceStream.Position;
 
                 byte[] buffer = new byte[0x1000];
-                int numRead = await sourceStream.ReadAsync(buffer, 0, count: 12 /*10*//*16*/ /*73*/ /*89*/);
+                int numRead = await sourceStream.ReadAsync(buffer, 0, 12);
 
                 byte[] array = new byte[numRead];
 
@@ -539,17 +471,14 @@ array[index]);
             
             List<byte[]> rawFundusImages = new List<byte[]>();
 
-
-
-            
             List<double[]> rawTomogramSliceImages = new List<double[]>();
 
             List<double[]> MappedDecimalValuesForTomogramSlices = new List<double[]>();
 
-            for (int index = /*0*/dataChunksToProcess.Count - 1; index >= 0 /*< dataChunksToProcess.Count*/; index--/*index++*/)
+            for (int index = dataChunksToProcess.Count - 1; index >= 0; index--)
             {
                 Dictionary<string, object> chunk = new Dictionary<string, object>();
-                int startingPositionOfChunk = (int)dataChunksToProcess./*Peek().Item1*/Pop().Item1;
+                int startingPositionOfChunk = (int)dataChunksToProcess.Pop().Item1;
                 long positionWithinStream = sourceStream.Seek(startingPositionOfChunk, SeekOrigin.Begin);
 
                 int numRead = await sourceStream.ReadAsync(buffer, 0, 12);
@@ -589,10 +518,6 @@ array[index]);
                 chunk["type"] = type;
                 chunk[nameof(unknown5)] = unknown5;
 
-                // Test:
-                uint test = 0x00000009;
-                uint test2 = 0x0000000B;
-                uint test3 = 0x0000000b;
                 if (type == 0x00000009)
                 {
                     numRead = await sourceStream.ReadAsync(buffer, 0, 31);
@@ -602,10 +527,6 @@ array[index]);
 
                     string givenName = Encoding.UTF8.GetString(thirtyOneBytes);
 
-                    // Test
-                    int testLength = givenName.Length;
-
-
                     numRead = await sourceStream.ReadAsync(buffer, 0, 66);
 
                     byte[] sixtySixBytes = new byte[numRead];
@@ -614,16 +535,7 @@ array[index]);
 
                     string surname = Encoding.UTF8.GetString(sixtySixBytes);
 
-
                     uint birthdate = await GetU32EntryAsync(sourceStream, buffer);
-
-                    /*
-                    numRead = await sourceStream.ReadAsync(buffer, 0, 1);
-                    byte oneByte = buffer[0];
-
-                    // A character can represent an unsigned integer https://www.tamasoft.co.jp/en/general-info/unicode-decimal.html,
-                    // or in other words, an unsigned integer can be represented by a character.
-                    char sex = (char)oneByte;*/
 
                     // The patient identifier (i.e. hospital number) a thirty character string (i.e. u8[30]) that is padded with white
                     // space. The first character of the patient identifier is the sex of the patient (i.e. 'M' or 'F'). So extract
@@ -644,16 +556,9 @@ array[index]);
                     //chunk[nameof(sex)] = sex;
                     chunk.Add("patient_identifier", patientIdentifier);
 
-                    
                     Given_name_entry_length = thirtyOneBytes.Length;
                     Surname_entry_length = sixtySixBytes.Length;
                     Patient_identifier_entry_length = thirtyBytes.Length;
-
-                    /*
-                    // Calls to Replace must come after remembering the length of entries of interest, in order to avoid breaking the
-                    // function PadWithNullCharacters
-                    givenName = givenName.Replace("\0", "\\0");
-                    surname = surname.Replace("\0", "\\0");*/
                 }
                 else if (type == 10)
                 {
@@ -667,7 +572,6 @@ array[index]);
                     numRead = await sourceStream.ReadAsync(buffer, 0, 36);
 
                     byte[] thirtySixBytes = new byte[numRead];
-
                     
                     Array.Copy(buffer, thirtySixBytes, numRead);
 
@@ -675,13 +579,8 @@ array[index]);
 
                     chunk.Add(nameof(unknown6), unknown6);
                     chunk["full_name_of_operator"] = fullNameOfOperator;
-
                     
                     Full_name_of_operator_entry_length = thirtySixBytes.Length;
-
-                    /*
-                    // This must come last to avoid breaking the function PadWithNullCharacters
-                    fullNameOfOperator = fullNameOfOperator.Replace("\0", "\\0");*/
                 }
                 else if (type == 0x0000000B)
                 {
@@ -870,7 +769,7 @@ array[index]);
             return chunks;
         }
 
-        public delegate /*R*/void DPlaceHolder<in A/*, in B*//*, out R*/>(A a/*, B b*/ );
+        public delegate void DPlaceHolder<in A>(A a);
 
         public delegate string DPlaceHolder2(IEnumerable<int> sequence, int index);
 
@@ -893,16 +792,8 @@ array[index]);
         {
             foreach (double d in doubles)
             {
-                yield return 256 * Math.Pow(x: d, y: 1.0 / /*6.0*//*1.0*/2.4);
+                yield return 256 * Math.Pow(x: d, y: 1.0 / 2.4);
             }
-        }
-
-
-        public static async Task PrintBytesInFileAsync(string filePath)
-        {
-            FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
-
-            byte[] buffer = new byte[0x1000000];
         }
 
         private static UInt16[] ToUInt16Array(byte[] bytes)
@@ -917,6 +808,7 @@ array[index]);
             return arrayOfUInt16;
         }
 
+        // Deprecated method
         public static void SearchAndReplace(string pattern1, string pattern2, string pattern3, string pattern4, string str1, string str2,
                                                         string str3, string str4)
         {
@@ -992,22 +884,22 @@ array[index]);
 
             for (int count = 1; count <= numTrailingNullCharsInNewPatientIdentifierEntry; count++)
             {
-                str1 += "\\0";
+                str1 += "\0";
             }
 
             for (int count = 1; count <= numTrailingNullCharsInNewGivenNameEntry; count++)
             {
-                str2 += "\\0";
+                str2 += "\0";
             }
 
             for (int count = 1; count <= numTrailingNullCharsInNewSurnameEntry; count++)
             {
-                str3 += "\\0";
+                str3 += "\0";
             }
 
             for (int count = 1; count <= numTrailingNullCharsInFullNameOfOperatorEntry; count++)
             {
-                str4 += "\\0";
+                str4 += "\0";
             }
 
             return new Tuple<string, string, String, String>(str1, str2, str3, str4);
@@ -1027,7 +919,6 @@ array[index]);
 
         public static void CreateDicom(string firstName, string lastName, string patientNumber, string imagesdirectory)
         {
-            //string directory = "directory";
             for (int index = 0; index < DecimalValuesMappedBetween0And255.Length; index++)
             {
                 ImageFromTomogramSliceImageBytes(index, imagesdirectory);
@@ -1041,15 +932,12 @@ array[index]);
             BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, tempDirectory);
         }
 
-        public static void /*string*/ ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
+        public static void ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
         {
             
             int width = (int)dimensionsOfTomogramSliceImages[index].Item1;
             int height = (int)dimensionsOfTomogramSliceImages[index].Item2;
             var output = new Bitmap(width: width, height: height);
-
-
-
 
             DMovingWindow createTomogramImage = MovingWindow;
 
@@ -1069,17 +957,13 @@ array[index]);
 
             createTomogramImage(output, index, dyn);
             Console.WriteLine("THE INDEX IS "+index);
-            // Todo: Create images directory before trying to save images to it
-            // For unix directory should end with /
+            
             var tomogramSliceImageFile = $"{imagesDirectory}tomogramSliceImage{/*index += 1*/++index/*index++*/}.bmp";
             Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
             resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
-
-
-            //return directory;
         }
 
-        public static void/*string*/ ImageFromFundusImageBytes(int index, string imagesDirectory)
+        public static void ImageFromFundusImageBytes(int index, string imagesDirectory)
         {
 
             int fundusImageWidth = (int)dimensionsOfFundusImages[index].Item1;
@@ -1087,24 +971,20 @@ array[index]);
 
             dynamic propertyBag = new ExpandoObject();
 
-            propertyBag.ArrayOfImageData = Raw_Fundus_Images_As_Array/*[0]*/;
+            propertyBag.ArrayOfImageData = Raw_Fundus_Images_As_Array;
 
             int width = (int) dimensionsOfFundusImages[index].Item1;
             int height = (int)dimensionsOfFundusImages[index].Item2;
 
-            Bitmap fundusBitmap = new Bitmap(width, height/*, PixelFormat.Format24bppRgb*/);
+            Bitmap fundusBitmap = new Bitmap(width, height);
 
             DMovingWindow createFundusImage = MovingWindowFundus;
 
             createFundusImage(fundusBitmap, index, propertyBag);
-            //Todo: If operating system is windows use a different path, otherwise if operating system is unix use normal path
+
             var fundusImageFile = $"{imagesDirectory}fundusImage{index +=1}.bmp";
             Bitmap resizedFundusImage = ResizeImage(fundusBitmap, 768, 768);
             resizedFundusImage.Save(fundusImageFile, ImageFormat.Bmp);
-
-            //string directory = fundusImageFile.Replace("/fundusImage.bmp", "");
-
-            //return directory;
         }
 
 
@@ -1112,10 +992,6 @@ array[index]);
 
         public static void MovingWindow(Bitmap bitmap, int index, dynamic obj)
         {
-            
-
-            
-
             foreach(double[] array in obj.ArrayOfImageData)
             {
                 uint indexOfInnerArray = 0;
@@ -1123,7 +999,7 @@ array[index]);
                 {
                     if (d > 255)
                     {
-                        obj.ArrayOfImageData[index][indexOfInnerArray] /*-= 1*/ = 255;
+                        obj.ArrayOfImageData[index][indexOfInnerArray] = 255;
                     } else if (d < 0)
                     {
                         obj.ArrayOfImageData[index][indexOfInnerArray] = 0;
@@ -1134,8 +1010,6 @@ array[index]);
 
             int n = 1;
             int step = 0;
-            int count = 0;
-
             for (int x = 0; x < bitmap.Width; x++, n++)
             {
                 for (int y = 0, position = step; position < bitmap.Height * n; y++, position++)
@@ -1150,7 +1024,6 @@ array[index]);
 
         public static void MovingWindowFundus(Bitmap bitmap, int index, dynamic obj)
         {
-
             int n = 1;
             int step = 0;
 
@@ -1158,7 +1031,7 @@ array[index]);
             {
                 for (int y = 0, position1 = step; position1 < bitmap.Height * n; y++, position1++)
                 {
-                    Color color = Color.FromArgb(/*(int)*/ obj.ArrayOfImageData[index][position1], /*(int)*/ obj.ArrayOfImageData[index][position1], /*(int)*/ obj.ArrayOfImageData[index][position1]);
+                    Color color = Color.FromArgb(obj.ArrayOfImageData[index][position1], obj.ArrayOfImageData[index][position1], obj.ArrayOfImageData[index][position1]);
                     bitmap.SetPixel(x, y, color);
                 }
 
@@ -1174,12 +1047,12 @@ array[index]);
             return resized;
         }
 
-        public static string FindChunk(ChunkType chunkType/*string searchTerm*/, Dictionary<string, Dictionary<string, object>> chunks)
+        public static string FindChunk(ChunkType chunkType, Dictionary<string, Dictionary<string, object>> chunks)
         {
             string chunkName;
-            switch (chunkType/*searchTerm*/)
+            switch (chunkType)
             {
-                case ChunkType.patientInfo/*"patient info"*/:
+                case ChunkType.patientInfo:
                     {
                         IEnumerable<string> chunkNameQuery =
                             from chunk in chunks
@@ -1196,7 +1069,7 @@ array[index]);
                     {
                         IEnumerable<string> queryOperatorName =
                             from kvp in chunks
-                            where kvp.Value.ContainsKey(key: "full_name_of_operator")/*Contains(new KeyValuePair<string, object>(key: "", va))*/
+                            where kvp.Value.ContainsKey(key: "full_name_of_operator")
                             select kvp.Key;
 
                         string operatorName = queryOperatorName.Single<string>();
@@ -1219,17 +1092,51 @@ array[index]);
             patientInfo, operatorInfo
         }
 
-        public static double[]/*void*/ InvertIntensity(double[] imageData)
+        public static double[] InvertIntensity(double[] imageData)
         {
             IEnumerable<double> queryElements =
                 from d in imageData
                 let inverted = 255 - d
                 select inverted;
 
-            // Renamed from invertedGreyScale
             double[] invertedIntensities = queryElements.ToArray();
 
             return invertedIntensities;
+        }
+
+        public static void Substitute(string filePath, string str1, string str2, string str3, string str4, string replacement1, string replacement2,
+            string replacement3, string replacement4)
+        {
+            Tuple<string, string, string, string> tuple = PadWithNullCharacters(replacement1, replacement2, replacement3, replacement4);
+            replacement1 = tuple.Item1;
+            replacement2 = tuple.Item2;
+            replacement3 = tuple.Item3;
+            replacement4 = tuple.Item4;
+
+            string[] fileNames = new string[] {filePath};
+
+            IEnumerable<string> queryStrings =
+                from file in fileNames
+                let bytes = File.ReadAllBytes(file)
+                let iso88591 = Encoding.GetEncoding("ISO-8859-1")
+                let iso88591FileText = iso88591.GetString(bytes)
+                let size = iso88591FileText.Length
+                let result1 = iso88591FileText.Replace(str1, replacement1)
+                let result2 = result1.Replace(str2, replacement2)
+                let result3 = result2.Replace(str3, replacement3)
+                let result4 = result3.Replace(str4, replacement4)
+                select result4;
+
+            string outputText = queryStrings.SingleOrDefault();
+            
+            string newFile = tempDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+
+            File.WriteAllText(path: newFile, contents: outputText, encoding: Encoding.GetEncoding("ISO-8859-1"));
+        }
+
+        private enum ExitCode
+        {
+            success = 0, failed = 1
         }
 
     }
