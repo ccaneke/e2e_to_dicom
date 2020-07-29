@@ -808,37 +808,6 @@ namespace E2EFileInterpreter
             return arrayOfUInt16;
         }
 
-        // Deprecated method
-        public static void SearchAndReplace(string pattern1, string pattern2, string pattern3, string pattern4, string str1, string str2,
-                                                        string str3, string str4)
-        {
-
-            Tuple<string, string, String, String> quadruple = PadWithNullCharacters(str1, str2, str3, str4);
-
-
-            string newFile = /*"/tmp/"*/ tempDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
-
-            File.Copy(sourceFileName: filePath, destFileName: newFile);
-
-            string test2 = $"-i -pe \'s/{pattern1}/{str1}/; s/{pattern2}/{str2}/; s/{pattern3}/{str3}/; s/{pattern4}/{str4}/\'" + " " + newFile;
-
-
-            string argument = $"-i -pe \"s/{pattern1}/{quadruple.Item1/*str1*/}/; s/{pattern2}/{quadruple.Item2/*str2*/}/; s/{pattern3}/{quadruple.Item3/*str3*/}/; s/{pattern4}/{quadruple.Item4/*str4*/}/\"" + " " + newFile;
-
-            Console.WriteLine("HERE IS THE VALUE OF THE VARIABLE ARGUMENT:");
-            Console.WriteLine(argument);
-
-            ProcessStartInfo processStartInfo = new ProcessStartInfo(fileName: "perl", argument);
-
-            processStartInfo.UseShellExecute = true;
-
-            Process perl = new Process();
-
-            perl.StartInfo = processStartInfo;
-
-            perl.Start();
-        }
-
         public static string GetDirectory(string filePath)
         {
             string DirectoryPath = "";
