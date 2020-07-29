@@ -19,6 +19,7 @@ using System.Dynamic;
 using Randomizer = AnonymizationLibrary.Randomizer;
 
 using System.Text.Encodings;
+using System.Reflection;
 
 namespace E2EFileInterpreter
 {
@@ -132,14 +133,21 @@ namespace E2EFileInterpreter
 
             string[] familyNames = null;
 
+            string outputDirectoryPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            string slash = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\" : "/";
+            string familyNamesDirectoryPath = Path.Combine(outputDirectoryPath, $"Surnames{slash}");
+            string familyNamesFilePath = new Uri(familyNamesDirectoryPath + "family_names.txt").LocalPath;
+
             try
             {
-                familyNames = await File.ReadAllLinesAsync("/Users/christopheraneke/Projects/E2EFileInterpreter/E2EFileInterpreter/" +
-                                "family_names.txt");
+                familyNames = await File.ReadAllLinesAsync(familyNamesFilePath);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
+                Console.WriteLine(ex.Message);
+                Console.WriteLine(nameof(outputDirectoryPath) + ": " + outputDirectoryPath);
+                Console.WriteLine(nameof(familyNamesFilePath) + ": " + familyNamesFilePath); 
             }
 
             Random randomNumberGenerator = new Random();
