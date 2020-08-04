@@ -13,9 +13,9 @@ namespace Dicom
 {
     public class BitmapToDicom
     {
-        public static void ImportImages(string directory, string firstName, string lastName, string patientIdentifier, string tmpDir)
+        public static void ImportImages(string imagesDirectory, string firstName, string lastName, string patientIdentifier, string dicomOutputDirectory)
         {
-            string[] files = Directory.GetFiles(path: directory);
+            string[] files = Directory.GetFiles(path: imagesDirectory);
 
             IEnumerable<string> tomogramFilesQuery =
                 from file in files
@@ -102,10 +102,10 @@ namespace Dicom
                 pixelData.AddFrame(data: buffer);
             }
 
-            Directory.CreateDirectory($"{tmpDir}dicom_export");
+            Directory.CreateDirectory($"{dicomOutputDirectory}dicom_export");
 
             DicomFile dicomFile = new DicomFile(dataset);
-            dicomFile.Save($"{tmpDir}dicom_export/dicom.dcm");
+            dicomFile.Save($"{dicomOutputDirectory}dicom_export/dicom.dcm");
         }
 
         private static void FillDataset(DicomDataset dataset, string firstName, string lastName, string patientIdentifier)

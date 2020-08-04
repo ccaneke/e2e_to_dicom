@@ -20,6 +20,7 @@ using Randomizer = AnonymizationLibrary.Randomizer;
 
 using System.Text.Encodings;
 using System.Reflection;
+using Newtonsoft.Json;
 
 namespace E2EFileInterpreter
 {
@@ -30,8 +31,6 @@ namespace E2EFileInterpreter
         static int count;
 
         static Stack<Tuple<UInt32, uint>> dataChunksToProcess = new Stack<Tuple<uint, uint>>();
-
-        static string filePath;
 
         static int Given_name_entry_length { get; set; }
         static int Surname_entry_length { get; set; }
@@ -72,14 +71,32 @@ namespace E2EFileInterpreter
 
         private static List<UInt16[]> scaledNumbers = new List<UInt16[]>();
 
-        private static string imagesDirectoryPath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\temp\\images2\\" : "/tmp/images2/";
+        private static string e2eFilePath;
+        private static string anonymizedE2eDirectory;
+        private static string imagesDirectory;
+        private static string dicomDirectory;
 
-        private static readonly string tempDirectory = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "/tmp/" : @"\temp\";
-
-        // arg[0] should be source file, arg[1] images directory. Make sure images directory path ends with /.
         private static async Task<Int32> Main(string[] args)
         {
-            string copy = $"{tempDirectory}{GetFileName(args[0]).Insert(startIndex: GetFileName(args[0]).Length - 4, value: "Copy")}";
+            string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string configFilePath = Path.Combine(exeDir, "config.json");
+
+            string settings = File.ReadAllText(configFilePath);
+
+            Settings settingsObj = JsonConvert.DeserializeObject<Settings>(settings);
+
+            string slash = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\" : "/";
+
+            settingsObj.AnonymizedE2eDirectory = settingsObj.AnonymizedE2eDirectory.EndsWith(slash) ? settingsObj.AnonymizedE2eDirectory : settingsObj.AnonymizedE2eDirectory + slash;
+            settingsObj.DicomDirectory = settingsObj.DicomDirectory.EndsWith('/') || settingsObj.DicomDirectory.EndsWith('\\') ? settingsObj.DicomDirectory : settingsObj.DicomDirectory + slash;
+            settingsObj.ImagesDirectory = settingsObj.ImagesDirectory.EndsWith(slash) ? settingsObj.ImagesDirectory : settingsObj.ImagesDirectory + slash;
+
+            e2eFilePath = settingsObj.SourceE2eFilePath;
+            anonymizedE2eDirectory = settingsObj.AnonymizedE2eDirectory;
+            imagesDirectory = settingsObj.ImagesDirectory;
+            dicomDirectory = settingsObj.DicomDirectory;
+
+            string copy = $"{anonymizedE2eDirectory}{GetFileName(e2eFilePath).Insert(startIndex: GetFileName(e2eFilePath).Length - 4, value: "Copy")}";
             if (File.Exists(path: copy))
             {
                 File.Delete(copy);
@@ -87,17 +104,15 @@ namespace E2EFileInterpreter
 
             try
             {
-                new DirectoryInfo(args[1]).GetFiles();
+                new DirectoryInfo(imagesDirectory).GetFiles();
             } catch (DirectoryNotFoundException)
             {
-                Directory.CreateDirectory(args[1]);
+                Directory.CreateDirectory(imagesDirectory);
             }
-
-            filePath = args[0];
 
             List<object> list = new List<object>();
             
-            await foreach (var item in HeaderAsync(Program.filePath, 0))
+            await foreach (var item in HeaderAsync(Program.e2eFilePath, 0))
             {
                 list.Add(item);
             }
@@ -105,7 +120,7 @@ namespace E2EFileInterpreter
             Header header = new Header(list[0] as string, (uint)list[1], list[2] as ushort[], (UInt16)list[3]);
 
             list.Clear();
-            await foreach (var item in MainDirectoryAsync(Program.filePath))
+            await foreach (var item in MainDirectoryAsync(Program.e2eFilePath))
             {
 
                 list.Add(item);
@@ -116,9 +131,9 @@ namespace E2EFileInterpreter
 
             MainDirectory mainDirectory = new MainDirectory(list[0], list[1], list[2], list[3], list[4], list[5], list[6], list[7]);
 
-            await TraverseListOfDirectoryChunks(mainDirectory.current, Program.filePath);
+            await TraverseListOfDirectoryChunks(mainDirectory.current, Program.e2eFilePath);
 
-            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.filePath);
+            Dictionary<string, Dictionary<string, object>> chunks = await ReadDataChunksAsync(filePath: Program.e2eFilePath);
 
             string patientInfoChunk = FindChunk(ChunkType.patientInfo, chunks);
 
@@ -135,7 +150,6 @@ namespace E2EFileInterpreter
 
             string outputDirectoryPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
-            string slash = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\\" : "/";
             string familyNamesDirectoryPath = Path.Combine(outputDirectoryPath, $"Surnames{slash}");
             string familyNamesFilePath = new Uri(familyNamesDirectoryPath + "family_names.txt").LocalPath;
 
@@ -158,14 +172,11 @@ namespace E2EFileInterpreter
 
             var operatorNameChunk = FindChunk(ChunkType.operatorInfo, chunks);
 
-            // Calls to Replace() method must come after the four properties ending with length are assigned a value, in order to
-            // avoid breaking the PadWithNullCharacters method.
-
-            Substitute(filePath, patient_identifier,(string) chunks[patientInfoChunk]["given_name"], (string) chunks[patientInfoChunk]["surname"],
+            Substitute(e2eFilePath, patient_identifier,(string) chunks[patientInfoChunk]["given_name"], (string) chunks[patientInfoChunk]["surname"],
                 (String)chunks[operatorNameChunk]["full_name_of_operator"], anonymized_patient_identifier, pseudo_given_name,
                 anonymized_surname, anonymized_full_name_of_operator);
 
-            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, args[1]);
+            CreateDicom(pseudo_given_name, anonymized_surname, anonymized_patient_identifier, imagesDirectory);
 
             return (int) ExitCode.success;
         }
@@ -176,7 +187,6 @@ namespace E2EFileInterpreter
                                                         true))
             {
                 count += 1;
-                
 
                 dataSourceStream.Position = positionWithinStream;
 
@@ -187,14 +197,12 @@ namespace E2EFileInterpreter
 
                 Array.Copy(buffer, array, length: numRead);
 
-                yield return Encoding.UTF8.GetString(array) /*Encoding.ASCII.GetString(array)*/;
+                yield return Encoding.UTF8.GetString(array);
 
                 numRead = await dataSourceStream.ReadAsync(buffer, 0, count: 4);
                 array = new byte[numRead];
 
                 Array.Copy(buffer, array, length: 4);
-
-                char[] test2 = Encoding.UTF8.GetChars(array);
 
                 string decodedWithUTF8 = Encoding.UTF8.GetString(array);
                 string decodedText = Encoding.UTF32.GetString(array);
@@ -207,7 +215,6 @@ namespace E2EFileInterpreter
                 array = new byte[numRead];
 
                 Array.Copy(buffer, array, length: numRead);
-
 
                 UInt16 num2 = (ushort)((array[1] << 8) | (array[0]));
 
@@ -906,7 +913,7 @@ namespace E2EFileInterpreter
                 ImageFromFundusImageBytes(index, imagesdirectory);
             }
 
-            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, tempDirectory);
+            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, dicomDirectory);
         }
 
         public static void ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
@@ -1105,8 +1112,8 @@ namespace E2EFileInterpreter
                 select result4;
 
             string outputText = queryStrings.SingleOrDefault();
-            
-            string newFile = tempDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+
+            string newFile = anonymizedE2eDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
 
             File.WriteAllText(path: newFile, contents: outputText, encoding: Encoding.GetEncoding("ISO-8859-1"));
         }
