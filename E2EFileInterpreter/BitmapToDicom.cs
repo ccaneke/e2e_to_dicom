@@ -13,7 +13,7 @@ namespace Dicom
 {
     public class BitmapToDicom
     {
-        public static void ImportImages(string imagesDirectory, string firstName, string lastName, string patientIdentifier, string dicomOutputDirectory)
+        public static void ImportImages(string imagesDirectory, string firstName, string lastName, string patientIdentifier, string dicomOutputDirectory, string guidString, string e2EFilePath)
         {
             string[] files = Directory.GetFiles(path: imagesDirectory);
 
@@ -102,10 +102,14 @@ namespace Dicom
                 pixelData.AddFrame(data: buffer);
             }
 
-            Directory.CreateDirectory($"{dicomOutputDirectory}dicom_export");
+            Directory.CreateDirectory($"{dicomOutputDirectory}dicom_export/{guidString}");
 
             DicomFile dicomFile = new DicomFile(dataset);
-            dicomFile.Save($"{dicomOutputDirectory}dicom_export/dicom.dcm");
+
+            char[] charactersToTrim = new char[] { '.', 'E', '2', 'E' };
+            string e2eFileNameWithoutExtension = new FileInfo(e2EFilePath).Name.ToUpper().TrimEnd(charactersToTrim);
+
+            dicomFile.Save($"{dicomOutputDirectory}dicom_export/{guidString}/{e2eFileNameWithoutExtension}Dicom.dcm");
         }
 
         private static void FillDataset(DicomDataset dataset, string firstName, string lastName, string patientIdentifier)

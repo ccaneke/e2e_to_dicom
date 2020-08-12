@@ -25,7 +25,7 @@ using Newtonsoft.Json;
 namespace E2EFileInterpreter
 {
     
-    class Program
+    public class Program
     {
         static Int64 position;
         static int count;
@@ -76,7 +76,9 @@ namespace E2EFileInterpreter
         private static string imagesDirectory;
         private static string dicomDirectory;
 
-        private static async Task<Int32> Main(string[] args)
+        public static string GuidString { get; set; }
+
+        /*private*/ public static async Task<Int32> Main(string[] args)
         {
             string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string configFilePath = Path.Combine(exeDir, "config.json");
@@ -913,7 +915,7 @@ namespace E2EFileInterpreter
                 ImageFromFundusImageBytes(index, imagesdirectory);
             }
 
-            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, dicomDirectory);
+            BitmapToDicom.ImportImages(imagesdirectory, firstName, lastName, patientNumber, dicomDirectory, GuidString, e2eFilePath);
         }
 
         public static void ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
@@ -1113,9 +1115,33 @@ namespace E2EFileInterpreter
 
             string outputText = queryStrings.SingleOrDefault();
 
-            string newFile = anonymizedE2eDirectory + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
+            string subDirectory = CreateUniqueE2eDirectory();
+
+            string newFile = anonymizedE2eDirectory + subDirectory + '/' + GetFileName(filePath).Insert(GetFileName(filePath).Length - 4, "Copy");
 
             File.WriteAllText(path: newFile, contents: outputText, encoding: Encoding.GetEncoding("ISO-8859-1"));
+        }
+
+        // Todo: Rename to CreateSubDirectory
+        public static string CreateUniqueE2eDirectory()
+        {
+            Guid guid = Guid.NewGuid();
+            string guidString = guid.ToString();
+
+            DirectoryInfo dir = new DirectoryInfo(path: $"{anonymizedE2eDirectory}{guidString}");
+
+            try
+            {
+                dir.Create();
+
+            } catch (IOException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            GuidString = guidString;
+
+            return dir.Name;
         }
 
         private enum ExitCode
