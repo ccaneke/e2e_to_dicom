@@ -1040,27 +1040,27 @@ namespace E2EFileInterpreter
             {
                 case ChunkType.patientInfo:
                     {
-                        IEnumerable<string> chunkNameQuery =
+                        IEnumerable<string> patientInfochunkNameQuery =
                             from chunk in chunks
                             from entry in chunk.Value
                             where entry.Key.SequenceEqual<char>("patient_identifier")
                             select chunk.Key;
 
-                        chunkName = chunkNameQuery.Single();
+                        chunkName = patientInfochunkNameQuery.Single();
 
                         return chunkName;
                     }
 
                 case ChunkType.operatorInfo:
                     {
-                        IEnumerable<string> queryOperatorName =
+                        IEnumerable<string> queryOperatorNameChunk =
                             from kvp in chunks
                             where kvp.Value.ContainsKey(key: "full_name_of_operator")
                             select kvp.Key;
 
-                        string operatorName = queryOperatorName.Single<string>();
+                        string operatorNameChunk = queryOperatorNameChunk.Single<string>();
 
-                        return operatorName;
+                        return operatorNameChunk;
                     }
 
                 default:
@@ -1103,7 +1103,7 @@ namespace E2EFileInterpreter
 
             IEnumerable<string> queryStrings =
                 from file in fileNames
-                let bytes = File.ReadAllBytes(file)
+                let bytes = /*File.ReadAllBytes(file)*/ ReadFile(file)
                 let iso88591 = Encoding.GetEncoding("ISO-8859-1")
                 let iso88591FileText = iso88591.GetString(bytes)
                 let size = iso88591FileText.Length
@@ -1128,7 +1128,16 @@ namespace E2EFileInterpreter
             Guid guid = Guid.NewGuid();
             string guidString = guid.ToString();
 
-            DirectoryInfo dir = new DirectoryInfo(path: $"{anonymizedE2eDirectory}{guidString}");
+            DirectoryInfo dir = null;
+
+            try
+            {
+            /*DirectoryInfo*/ dir = new DirectoryInfo(path: $"{anonymizedE2eDirectory}{guidString}");
+
+            } catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            } 
 
             try
             {
@@ -1142,6 +1151,29 @@ namespace E2EFileInterpreter
             GuidString = guidString;
 
             return dir.Name;
+        }
+
+        private static byte[] ReadFile(FileInfo fi)
+        {
+            byte[] content;
+
+            if (fi.Exists && fi.Directory.Exists)
+            {
+                //byte[] content = new byte[0x10000000];
+                content = File.ReadAllBytes(fi.FullName);
+            } else
+            {
+                content = new byte[] { };
+            }
+
+            return content;
+        }
+
+        private static byte[] ReadFile(string fileName)
+        {
+            FileInfo file = new FileInfo(fileName);
+
+            return ReadFile(file);
         }
 
         private enum ExitCode
