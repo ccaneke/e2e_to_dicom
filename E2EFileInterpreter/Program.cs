@@ -78,6 +78,7 @@ namespace E2EFileInterpreter
 
         public static string GuidString { get; set; }
 
+        // A single .E2E file should be passed as an argument.
         /*private*/ public static async Task<Int32> Main(string[] args)
         {
             string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -93,7 +94,8 @@ namespace E2EFileInterpreter
             settingsObj.DicomDirectory = settingsObj.DicomDirectory.EndsWith('/') || settingsObj.DicomDirectory.EndsWith('\\') ? settingsObj.DicomDirectory : settingsObj.DicomDirectory + slash;
             settingsObj.ImagesDirectory = settingsObj.ImagesDirectory.EndsWith(slash) ? settingsObj.ImagesDirectory : settingsObj.ImagesDirectory + slash;
 
-            e2eFilePath = settingsObj.SourceE2eFilePath;
+            //e2eFilePath = settingsObj.SourceE2eFilePath;
+            e2eFilePath = args[0];
             anonymizedE2eDirectory = settingsObj.AnonymizedE2eDirectory;
             imagesDirectory = settingsObj.ImagesDirectory;
             dicomDirectory = settingsObj.DicomDirectory;
