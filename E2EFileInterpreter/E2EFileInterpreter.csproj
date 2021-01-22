@@ -9,9 +9,6 @@
     <Reference Include="AnonymizationLibrary">
       <HintPath>AnonymizationLibrary.dll</HintPath>
     </Reference>
-    <Reference Include="OpenCvSharp">
-      <HintPath>OpenCvSharp.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="fo-dicom.NetCore" Version="4.0.6" />

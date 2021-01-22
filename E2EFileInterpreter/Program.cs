@@ -907,6 +907,9 @@ namespace E2EFileInterpreter
 
         public static void CreateDicom(string firstName, string lastName, string patientNumber, string imagesdirectory)
         {
+            char slash = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? '\\' : '/';
+            _ = Directory.CreateDirectory(imagesDirectory + slash + GuidString);
+
             for (int index = 0; index < DecimalValuesMappedBetween0And255.Length; index++)
             {
                 ImageFromTomogramSliceImageBytes(index, imagesdirectory);
@@ -922,7 +925,6 @@ namespace E2EFileInterpreter
 
         public static void ImageFromTomogramSliceImageBytes(int index, string imagesDirectory)
         {
-            
             int width = (int)dimensionsOfTomogramSliceImages[index].Item1;
             int height = (int)dimensionsOfTomogramSliceImages[index].Item2;
             var output = new Bitmap(width: width, height: height);
@@ -946,7 +948,7 @@ namespace E2EFileInterpreter
             createTomogramImage(output, index, dyn);
             Console.WriteLine("THE INDEX IS "+index);
             
-            var tomogramSliceImageFile = $"{imagesDirectory}tomogramSliceImage{/*index += 1*/++index/*index++*/}.bmp";
+            var tomogramSliceImageFile = $"{imagesDirectory}{Program.GuidString}/tomogramSliceImage{/*index += 1*/++index/*index++*/}.bmp";
             Bitmap resizedTomogramSliceImage = ResizeImage(output, 768, 768);
             resizedTomogramSliceImage.Save(tomogramSliceImageFile, ImageFormat.Bmp);
         }
@@ -970,7 +972,7 @@ namespace E2EFileInterpreter
 
             createFundusImage(fundusBitmap, index, propertyBag);
 
-            var fundusImageFile = $"{imagesDirectory}fundusImage{index +=1}.bmp";
+            var fundusImageFile = $"{imagesDirectory}{GuidString}/fundusImage{index +=1}.bmp";
             Bitmap resizedFundusImage = ResizeImage(fundusBitmap, 768, 768);
             resizedFundusImage.Save(fundusImageFile, ImageFormat.Bmp);
         }

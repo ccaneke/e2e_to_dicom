@@ -13,9 +13,10 @@ namespace Dicom
 {
     public class BitmapToDicom
     {
-        public static void ImportImages(string imagesDirectory, string firstName, string lastName, string patientIdentifier, string dicomOutputDirectory, string guidString, string e2EFilePath)
+        public static void ImportImages(string imagesDirectory, string firstName, string lastName, string patientIdentifier, string dicomOutputDirectory, string guidString, string e2eFilePath)
         {
-            string[] files = Directory.GetFiles(path: imagesDirectory);
+            string e2eImagesDirectory = imagesDirectory + guidString;
+            string[] files = Directory.GetFiles(path: e2eImagesDirectory);
 
             IEnumerable<string> tomogramFilesQuery =
                 from file in files
@@ -107,7 +108,7 @@ namespace Dicom
             DicomFile dicomFile = new DicomFile(dataset);
 
             char[] charactersToTrim = new char[] { '.', 'E', '2', 'E' };
-            string e2eFileNameWithoutExtension = new FileInfo(e2EFilePath).Name.ToUpper().TrimEnd(charactersToTrim);
+            string e2eFileNameWithoutExtension = new FileInfo(e2eFilePath).Name.ToUpper().TrimEnd(charactersToTrim);
 
             dicomFile.Save($"{dicomOutputDirectory}dicom_export/{guidString}/{e2eFileNameWithoutExtension}Dicom.dcm");
         }
